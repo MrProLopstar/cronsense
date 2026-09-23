@@ -1,6 +1,6 @@
 {
   "name": "cronsense",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Turn plain Russian or English schedules into cron expressions: «по будням в 9:30» → 30 9 * * 1-5",
   "keywords": [
     "cron",
@@ -9,7 +9,9 @@
     "schedule",
     "parser",
     "russian",
-    "i18n"
+    "i18n",
+    "mcp",
+    "ai-tools"
   ],
   "license": "MIT",
   "type": "module",
@@ -27,7 +29,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "cronsense": "./dist/cli.js"
+    "cronsense": "./dist/cli.js",
+    "cronsense-mcp": "./dist/mcp.js"
   },
   "files": [
     "dist",
@@ -36,10 +39,11 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p site/tsconfig.json",
+    "test": "npm run build && vitest run",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "build:site": "tsc -p site/tsconfig.json && node -e \"require('node:fs').copyFileSync('site/index.html', 'site-dist/index.html')\""
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

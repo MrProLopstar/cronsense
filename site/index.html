@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>cronsense playground</title>
+<meta name="description" content="Turn plain Russian or English schedules into cron expressions and back.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e7c66'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='white' stroke-width='2.5'/%3E%3Cpath d='M16 10v6l4 3' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f6f5f1;
+  --panel: #ffffff;
+  --ink: #1b1d1c;
+  --muted: #676d69;
+  --line: #e2e0d8;
+  --accent: #0e7c66;
+  --accent-soft: #e2f2ed;
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111413;
+    --panel: #1a1e1c;
+    --ink: #eceeed;
+    --muted: #9aa29e;
+    --line: #2c3230;
+    --accent: #3fc6a4;
+    --accent-soft: #173229;
+    --danger: #ff8a80;
+    --danger-soft: #3a1c1a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 860px; margin: 0 auto; padding: 40px 20px 64px; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+h1 span { color: var(--accent); }
+.tagline { margin: 4px 0 0; color: var(--muted); }
+nav { display: flex; gap: 8px; align-items: center; }
+nav a, .toggle button {
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+nav a:hover { border-color: var(--accent); }
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--panel); }
+.toggle button { border: 0; background: transparent; color: var(--muted); }
+.toggle button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+label { font-size: 14px; color: var(--muted); }
+input[type="text"] {
+  width: 100%;
+  font: inherit;
+  font-size: 20px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+}
+input[type="text"]:focus { border-color: var(--accent); }
+input.mono { font-family: var(--mono); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chips button {
+  font: inherit;
+  font-size: 13px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.chips button:hover { color: var(--accent); border-color: var(--accent); }
+.result { margin-top: 24px; }
+.cron { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cron code { font-family: var(--mono); font-size: 30px; font-weight: 600; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.copy { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.description { margin: 8px 0 0; font-size: 18px; color: var(--accent); }
+.fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 20px; }
+.field { border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center; min-width: 0; }
+.field b { display: block; font-family: var(--mono); font-size: 16px; overflow-wrap: anywhere; }
+.field span { font-size: 12px; color: var(--muted); }
+h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 24px 0 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+ol { margin: 0; padding-left: 22px; font-family: var(--mono); font-size: 15px; }
+.error { margin-top: 20px; border-radius: 12px; background: var(--danger-soft); color: var(--danger); padding: 14px 16px; }
+.error pre { margin: 8px 0 0; font-family: var(--mono); font-size: 14px; white-space: pre-wrap; overflow-x: auto; }
+.error mark { background: var(--danger); color: var(--danger-soft); border-radius: 3px; padding: 0 2px; }
+.install { margin-top: 28px; }
+.install pre { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-family: var(--mono); font-size: 14px; overflow-x: auto; margin: 0; }
+footer { margin-top: 32px; color: var(--muted); font-size: 14px; }
+footer a { color: inherit; }
+@media (max-width: 560px) {
+  .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cron code { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>cron<span>sense</span></h1>
+      <p class="tagline" data-i18n="tagline"></p>
+    </div>
+    <nav>
+      <div class="toggle" role="group" aria-label="Language">
+        <button type="button" data-lang="ru">RU</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+      <a href="https://github.com/MrProLopstar/cronsense">GitHub</a>
+      <a href="https://jsr.io/@mrprolopstar/cronsense">JSR</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <div class="toggle" role="group" aria-label="Mode">
+        <button type="button" data-mode="text" data-i18n="modeText"></button>
+        <button type="button" data-mode="cron" data-i18n="modeCron"></button>
+      </div>
+    </div>
+    <label for="input" data-i18n="inputLabel"></label>
+    <input id="input" type="text" autocomplete="off" spellcheck="false">
+    <div class="chips" id="examples"></div>
+
+    <div class="result" id="result" hidden>
+      <div class="cron">
+        <code id="cron"></code>
+        <button type="button" class="copy" id="copy" data-i18n="copy"></button>
+      </div>
+      <p class="description" id="description"></p>
+      <div class="fields" id="fields"></div>
+      <h2 data-i18n="nextRuns"></h2>
+      <ol id="runs"></ol>
+    </div>
+
+    <div class="error" id="error" hidden>
+      <strong id="error-title"></strong>
+      <pre id="error-excerpt"></pre>
+    </div>
+  </section>
+
+  <section class="install">
+    <h2 data-i18n="install"></h2>
+    <pre>npx jsr add @mrprolopstar/cronsense</pre>
+  </section>
+
+  <footer data-i18n-html="footer"></footer>
+</main>
+<script type="module" src="./site/app.js"></script>
+</body>
+</html>

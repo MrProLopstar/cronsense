@@ -1,6 +1,13 @@
 # cronsense
 
-Turn plain Russian or English schedules into cron expressions.
+[![JSR](https://jsr.io/badges/@mrprolopstar/cronsense)](https://jsr.io/@mrprolopstar/cronsense)
+[![JSR Score](https://jsr.io/badges/@mrprolopstar/cronsense/score)](https://jsr.io/@mrprolopstar/cronsense/score)
+[![CI](https://github.com/MrProLopstar/cronsense/actions/workflows/ci.yml/badge.svg)](https://github.com/MrProLopstar/cronsense/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Turn plain Russian or English schedules into cron expressions, and cron back into plain text.
+
+**[▶ Try it in the playground](https://mrprolopstar.github.io/cronsense/)**
 
 ```
 по будням в 9:30                          →  30 9 * * 1-5
@@ -8,13 +15,16 @@ Turn plain Russian or English schedules into cron expressions.
 1 и 15 числа в 12:00                      →  0 12 1,15 * *
 every other day at noon                   →  0 12 */2 * *
 mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
+
+0 23 * * 0,1,5,6    →  с пятницы по понедельник в 23:00  /  from friday through monday at 11pm
 ```
 
-- Russian and English, mixed freely, with Russian word forms handled
-- No dependencies, no LLM, fully deterministic
-- Strict TypeScript types, errors carry a code and the position of the problem
-- Refuses to guess: anything cron cannot express exactly is an error, not a silent approximation
-- Works both ways: `describe` turns cron back into natural text that parses to the same schedule
+- **Both directions:** `toCron` for text → cron, `describe` for cron → text
+- **Round-trip guarantee:** every description parses back to an equivalent schedule, checked on thousands of random expressions
+- **Real Russian:** word forms, «в 3 часа дня», «со вторника по четверг», «каждую 21 минуту»
+- **No LLM, no dependencies,** fully deterministic, runs in Node, Deno, Bun and browsers
+- **Refuses to guess:** anything cron cannot express exactly is an error with a code and the position of the problem
+- **Ready for AI agents:** a built-in [MCP server](#mcp-server-for-ai-agents), because LLMs often get cron wrong
 
 ## Install
 
@@ -67,6 +77,62 @@ npx cronsense --cron -n 3 --utc "0 9 * * 1-5"
 npx cronsense --json "1 числа каждого месяца"
 npx cronsense --cron --explain --locale ru "0 9 * * 1,3,5"
 ```
+
+## With your scheduler
+
+cronsense only produces cron strings, so it works with any scheduler:
+
+```ts
+import cron from 'node-cron';
+import { toCron } from '@mrprolopstar/cronsense';
+
+cron.schedule(toCron('по будням в 9:30'), sendDailyReport);
+```
+
+```ts
+import { Queue } from 'bullmq';
+import { toCron } from '@mrprolopstar/cronsense';
+
+await new Queue('reports').add('weekly', {}, { repeat: { pattern: toCron('every monday at 8am') } });
+```
+
+For user-facing apps such as Telegram bots, parse what the user typed and echo back the canonical wording to confirm:
+
+```ts
+const result = safeParse(message.text);
+reply(result.ok ? `Буду напоминать ${describe(result.schedule, { locale: 'ru' })}` : result.error.excerpt);
+```
+
+## MCP server for AI agents
+
+LLMs regularly produce subtly wrong cron. `cronsense-mcp` gives agents deterministic tools instead:
+
+| Tool | What it does |
+| --- | --- |
+| `to_cron` | Schedule text → cron plus canonical description |
+| `describe_cron` | Cron → natural Russian or English |
+| `next_runs` | Upcoming run times as ISO 8601 |
+
+Claude Code:
+
+```bash
+claude mcp add cronsense -- npx -y -p github:MrProLopstar/cronsense cronsense-mcp
+```
+
+Claude Desktop, Cursor and other clients (`mcpServers` config):
+
+```json
+{
+  "mcpServers": {
+    "cronsense": {
+      "command": "npx",
+      "args": ["-y", "-p", "github:MrProLopstar/cronsense", "cronsense-mcp"]
+    }
+  }
+}
+```
+
+The server has no dependencies and speaks MCP over stdio (protocol versions 2024-11-05 to 2025-06-18).
 
 ## API
 
