@@ -1,0 +1,57 @@
+{
+  "name": "cronsense",
+  "version": "0.1.0",
+  "description": "Turn plain Russian or English schedules into cron expressions: «по будням в 9:30» → 30 9 * * 1-5",
+  "keywords": [
+    "cron",
+    "crontab",
+    "natural-language",
+    "schedule",
+    "parser",
+    "russian",
+    "i18n"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "cronsense": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "author": "MrProLopstar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrProLopstar/cronsense.git"
+  },
+  "homepage": "https://github.com/MrProLopstar/cronsense#readme",
+  "bugs": {
+    "url": "https://github.com/MrProLopstar/cronsense/issues"
+  }
+}
