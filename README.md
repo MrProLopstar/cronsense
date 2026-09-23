@@ -1,5 +1,7 @@
 # cronsense
 
+**English** · [Русский](README.ru.md)
+
 [![JSR](https://jsr.io/badges/@mrprolopstar/cronsense)](https://jsr.io/@mrprolopstar/cronsense)
 [![JSR Score](https://jsr.io/badges/@mrprolopstar/cronsense/score)](https://jsr.io/@mrprolopstar/cronsense/score)
 [![CI](https://github.com/MrProLopstar/cronsense/actions/workflows/ci.yml/badge.svg)](https://github.com/MrProLopstar/cronsense/actions/workflows/ci.yml)
@@ -47,7 +49,7 @@ npm install github:MrProLopstar/cronsense
 ## Usage
 
 ```ts
-import { describe, nextRuns, parse, safeParse, toCron } from 'cronsense';
+import { describe, nextRuns, parse, safeParse, toCron } from '@mrprolopstar/cronsense';
 
 toCron('каждый день в 9 утра');
 // '0 9 * * *'
@@ -200,6 +202,8 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 ## Versioning
 
 cronsense follows [semver](https://semver.org). The public API (`parse`, `safeParse`, `toCron`, `describe`, `parseCron`, `nextRuns`, `formatCron`, exported types and error codes) only changes in a major release. New vocabulary and new locales can make previously rejected phrases parse; that is not a breaking change. See [CHANGELOG.md](CHANGELOG.md).
+
+To release, run **Actions → Release → Run workflow** and pick `patch`, `minor`, `major` or an exact version.
 
 ## License
 

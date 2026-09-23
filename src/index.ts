@@ -73,6 +73,8 @@
  * - "Weekly" means Sunday, as `@weekly`; change it with {@link ParseOptions.weeklyOn}.
  * - {@link nextRuns} supports local time and UTC and skips times that fall into a DST gap.
  *
+ * Документация на русском: https://github.com/MrProLopstar/cronsense/blob/main/README.ru.md
+ *
  * @module
  */
 import { CronsenseError } from './errors.js';

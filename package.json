@@ -36,7 +36,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "README.ru.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -3,6 +3,11 @@ name: Publish
 on:
   push:
     tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
 
 jobs:
   publish:
@@ -11,8 +16,12 @@ jobs:
       contents: write
       packages: write
       id-token: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -20,6 +29,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Check versions match the tag
+        run: |
+          version="${TAG#v}"
+          test "$(node -p "require('./package.json').version")" = "$version"
+          test "$(node -p "require('./jsr.json').version")" = "$version"
       - run: npx jsr publish
       - uses: actions/setup-node@v4
         with:
@@ -38,6 +52,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${TAG#v}"
           awk -v v="$version" '$0 == "## " v {found=1; next} found && /^## / {exit} found {print}' CHANGELOG.md > notes.md
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          if [ -s notes.md ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi

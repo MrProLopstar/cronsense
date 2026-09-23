@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        type: choice
+        options: [patch, minor, major, current]
+        default: patch
+      version:
+        description: Exact version instead of a bump, e.g. 1.2.0
+        type: string
+        required: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: version
+        name: Resolve version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXACT: ${{ inputs.version }}
+        run: |
+          current="$(node -p "require('./package.json').version")"
+          if [ -n "$EXACT" ]; then
+            next="$EXACT"
+          elif [ "$BUMP" = "current" ]; then
+            next="$current"
+          else
+            next="$(node -e "
+              const [major, minor, patch] = process.argv[1].split('.').map(Number);
+              const bump = process.argv[2];
+              console.log(bump === 'major' ? [major + 1, 0, 0].join('.') : bump === 'minor' ? [major, minor + 1, 0].join('.') : [major, minor, patch + 1].join('.'));
+            " "$current" "$BUMP")"
+          fi
+          if ! echo "$next" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid version $next"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$next" > /dev/null; then
+            echo "::error::Tag v$next already exists"
+            exit 1
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
+        run: |
+          git config user.name "$ACTOR"
+          git config user.email "$ACTOR_ID+$ACTOR@users.noreply.github.com"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          node -e "
+            const fs = require('node:fs');
+            const jsr = JSON.parse(fs.readFileSync('jsr.json', 'utf8'));
+            jsr.version = process.argv[1];
+            fs.writeFileSync('jsr.json', JSON.stringify(jsr, null, 2) + '\n');
+          " "$VERSION"
+          if ! git diff --quiet; then
+            git commit -am "Release $VERSION"
+            git push origin HEAD:main
+          fi
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+  publish:
+    needs: tag
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
