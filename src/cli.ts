@@ -5,6 +5,7 @@ import { CronsenseError } from './errors.js';
 import { nextRuns } from './next.js';
 import { parse } from './parser.js';
 import { parseCron } from './cron.js';
+import { describe } from './describe.js';
 import type { Schedule, Timezone, Weekday } from './types.js';
 
 const USAGE = `Usage: cronsense [options] <schedule...>
@@ -13,11 +14,14 @@ Examples:
   cronsense "по будням в 9:30"
   cronsense -n 3 "every 15 minutes from 9 to 18 on weekdays"
   cronsense --cron -n 5 "0 9 * * 1-5"
+  cronsense --cron --explain --locale ru "*/15 9-17 * * 1-5"
 
 Options:
   -n, --next <count>   Print the next <count> run times
       --utc            Compute run times in UTC instead of local time
       --cron           Treat input as a cron expression
+  -e, --explain        Print a natural-language description
+      --locale <ru|en> Language of the description (default en)
       --weekly-on <d>  Weekday for "weekly" (0-6, Sunday = 0; default 0)
       --json           Print machine-readable JSON
   -h, --help           Show this help
@@ -51,6 +55,8 @@ const main = (argv: readonly string[]): number => {
       next: { type: 'string', short: 'n' },
       utc: { type: 'boolean', default: false },
       cron: { type: 'boolean', default: false },
+      explain: { type: 'boolean', short: 'e', default: false },
+      locale: { type: 'string' },
       'weekly-on': { type: 'string' },
       json: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
@@ -75,17 +81,26 @@ const main = (argv: readonly string[]): number => {
 
   const count = toInteger(values.next, '--next', 1, 1000);
   const weeklyOn = toInteger(values['weekly-on'], '--weekly-on', 0, 6) as Weekday | undefined;
+  const locale = values.locale ?? 'en';
+  if (locale !== 'ru' && locale !== 'en') throw new RangeError('--locale must be "ru" or "en"');
   const timezone: Timezone = values.utc ? 'utc' : 'local';
   const schedule: Schedule = values.cron ? parseCron(input) : parse(input, weeklyOn === undefined ? {} : { weeklyOn });
   const runs = count === undefined ? [] : nextRuns(schedule, { count, timezone });
+  const description = values.explain ? describe(schedule, { locale }) : null;
 
   if (values.json) {
-    const payload = { cron: schedule.cron, fields: schedule.fields, next: runs.map((run) => run.toISOString()) };
+    const payload = {
+      cron: schedule.cron,
+      fields: schedule.fields,
+      ...(description === null ? {} : { description }),
+      next: runs.map((run) => run.toISOString()),
+    };
     process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
     return 0;
   }
 
   process.stdout.write(`${schedule.cron}\n`);
+  if (description !== null) process.stdout.write(`${description}\n`);
   for (const run of runs) process.stdout.write(`  ${formatDate(run, timezone)}\n`);
   return 0;
 };

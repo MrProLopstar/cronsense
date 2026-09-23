@@ -60,6 +60,13 @@ const russian: ReadonlyArray<readonly [string, string]> = [
   ['в субботу и воскресенье в 11:00', '0 11 * * 0,6'],
   ['в четверг в 9.30', '30 9 * * 4'],
   ['ёжедневно', '0 0 * * *'],
+  ['каждый час в 15 минут', '15 * * * *'],
+  ['в 0 и 30 минут', '0,30 * * * *'],
+  ['каждые 2 часа в 5 минут по будням', '5 */2 * * 1-5'],
+  ['каждый час с 20 до полуночи', '0 0,20-23 * * *'],
+  ['каждые 10 минут с полуночи до 6', '*/10 0-5 * * *'],
+  ['по понедельникам и со среды по пятницу в 9', '0 9 * * 1,3-5'],
+  ['в январе и с июня по август 1 числа', '0 0 1 1,6-8 *'],
 ];
 
 const english: ReadonlyArray<readonly [string, string]> = [
@@ -109,6 +116,9 @@ const english: ReadonlyArray<readonly [string, string]> = [
   ['once an hour', '0 * * * *'],
   ['each day at 9', '0 9 * * *'],
   ['every day at 9.', '0 9 * * *'],
+  ['every hour at 15 minutes past', '15 * * * *'],
+  ['every hour from 8pm to midnight', '0 0,20-23 * * *'],
+  ['on mondays and from wednesday through friday at 9am', '0 9 * * 1,3-5'],
 ];
 
 describe('parse — russian', () => {
@@ -178,6 +188,10 @@ const failures: ReadonlyArray<readonly [string, ErrorCode]> = [
   ['с 9', 'INCOMPLETE'],
   ['минут', 'UNEXPECTED_TOKEN'],
   ['в 9 #', 'UNEXPECTED_TOKEN'],
+  ['каждые 15 минут в 5 минут', 'CONFLICT'],
+  ['в 9:00 в 15 минут', 'CONFLICT'],
+  ['в 75 минут', 'OUT_OF_RANGE'],
+  ['15 минут числа', 'UNEXPECTED_TOKEN'],
 ];
 
 describe('errors', () => {

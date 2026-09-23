@@ -14,6 +14,7 @@ mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
 - No dependencies, no LLM, fully deterministic
 - Strict TypeScript types, errors carry a code and the position of the problem
 - Refuses to guess: anything cron cannot express exactly is an error, not a silent approximation
+- Works both ways: `describe` turns cron back into natural text that parses to the same schedule
 
 ## Install
 
@@ -30,7 +31,7 @@ npm install github:MrProLopstar/cronsense
 ## Usage
 
 ```ts
-import { parse, toCron, safeParse, nextRuns } from 'cronsense';
+import { describe, nextRuns, parse, safeParse, toCron } from 'cronsense';
 
 toCron('каждый день в 9 утра');
 // '0 9 * * *'
@@ -40,6 +41,11 @@ schedule.cron;
 // '0 8-20/2 * * *'
 schedule.fields.hour;
 // { kind: 'step', from: 8, to: 20, step: 2 }
+
+describe('*/15 9-17 * * 1-5', { locale: 'ru' });
+// 'каждые 15 минут с 9 до 18 по будням'
+describe('0 12 1,15 * *');
+// 'on the 1st and 15th at noon'
 
 nextRuns(schedule, { count: 3, timezone: 'utc' });
 // [Date, Date, Date]
@@ -59,6 +65,7 @@ npx cronsense "по будням в 9:30"
 npx cronsense -n 5 "every 15 minutes between 9 and 17"
 npx cronsense --cron -n 3 --utc "0 9 * * 1-5"
 npx cronsense --json "1 числа каждого месяца"
+npx cronsense --cron --explain --locale ru "0 9 * * 1,3,5"
 ```
 
 ## API
@@ -70,6 +77,7 @@ npx cronsense --json "1 числа каждого месяца"
 | `toCron(text, options?)` | Returns the cron string |
 | `parseCron(expression)` | Parses a 5-field cron expression or macro (`@daily`, …) into a `Schedule` |
 | `nextRuns(schedule \| expression, options?)` | Next run times; options: `count` (default 5), `from`, `timezone` (`'local'` or `'utc'`) |
+| `describe(schedule \| expression, options?)` | Natural-language description; `locale`: `'en'` (default) or `'ru'` |
 | `formatCron(fields)` | Formats structured fields back into a cron string |
 
 `ParseOptions.weeklyOn` sets the weekday used by "weekly" / «еженедельно» (default `0`, Sunday, as in `@weekly`).
@@ -92,11 +100,23 @@ npx cronsense --json "1 числа каждого месяца"
 
 - Intervals: every N minutes / hours / days / months, «через день», "every other hour", «раз в 5 минут», "once a day"
 - Frequencies: hourly, daily, weekly, monthly, yearly / «ежечасно», «ежедневно», …
+- Minutes of the hour: «каждый час в 15 минут», "every hour at 15 minutes past"
 - Times: `9:30`, `9.30`, `9am`, `7 p.m.`, noon / midnight, «в 3 часа дня», «в 11 ночи», «9 часов 45 минут», several times at once
 - Time ranges for intervals: «с 9 до 18», "between 9 and 17", «до 12», overnight windows like «с 22 до 6»
 - Weekdays: names, abbreviations, ranges (`пн-пт`, "monday through friday"), weekdays / weekends
 - Days of month: «1 и 15 числа», «с 1 по 10 число», "on the 1st and 15th", «15 января», "jan 15"
 - Months: names, lists, ranges, including ranges across the new year («с ноября по февраль»)
+
+## Describing cron
+
+`describe` picks the most natural wording: intervals, time ranges, weekday and month ranges, «15 января», noon and midnight. Every description it produces is accepted by `parse` and yields an equivalent schedule; this is checked on thousands of random expressions in both languages. The only exception is a cron that restricts both day-of-month and weekday: cron joins them with OR, so the text says «или» / "or" and is intentionally not parseable.
+
+```
+30 9 * * 1-5       по будням в 9:30                            on weekdays at 9:30am
+0 23 * * 0,1,5,6   с пятницы по понедельник в 23:00            from friday through monday at 11pm
+0 8-20/2 * * *     каждые 2 часа с 8 до 20                     every 2 hours from 8am to 8pm
+5-59/10 * * * *    каждый час в 5, 15, 25, 35, 45 и 55 минут   every hour at 5, 15, 25, 35, 45 and 55 minutes past
+```
 
 ## Semantics worth knowing
 

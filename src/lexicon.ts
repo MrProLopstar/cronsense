@@ -77,8 +77,8 @@ const RULES: readonly Rule[] = [
   [/^(?:утра|am|morning)$/, { t: 'meridiem', meridiem: 'am' }],
   [/^(?:вечера|pm|evening|afternoon)$/, { t: 'meridiem', meridiem: 'pm' }],
   [/^(?:ночи|night)$/, { t: 'meridiem', meridiem: 'night' }],
-  [/^(?:полдень|noon|midday)$/, { t: 'clock', hour: 12 }],
-  [/^(?:полночь|midnight)$/, { t: 'clock', hour: 0 }],
+  [/^(?:полдень|полудня|noon|midday)$/, { t: 'clock', hour: 12 }],
+  [/^(?:полночь|полуночи|midnight)$/, { t: 'clock', hour: 0 }],
 
   [/^(?:с|со|from|between|starting)$/, { t: 'from' }],
   [/^(?:до|to|through|thru|till|until)$/, { t: 'to', weak: false }],
@@ -87,7 +87,7 @@ const RULES: readonly Rule[] = [
   [/^(?:в|во|на|at|on|in|per|a|an)$/, { t: 'at' }],
   [/^(?:числа|число|числам)$/, { t: 'domMarker' }],
 
-  [/^(?:the|of|o|clock|ровно|дни|дням|днями|also|также)$/, { t: 'noise' }],
+  [/^(?:the|of|o|clock|ровно|дни|дням|днями|also|также|past)$/, { t: 'noise' }],
 
   [/^(?:последн[а-я]*|last)$/, { t: 'unsupported', feature: 'last day / last weekday of month' }],
   [/^(?:секунд[а-я]*|seconds?|secs?)$/, { t: 'unsupported', feature: 'second-level precision' }],

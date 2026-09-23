@@ -23,7 +23,8 @@ interface TimeWindow {
 
 type Item =
   | { readonly k: 'num'; readonly value: number; readonly ordinal: boolean; readonly span: Span }
-  | { readonly k: 'clock'; readonly clock: Clock };
+  | { readonly k: 'clock'; readonly clock: Clock }
+  | { readonly k: 'mark'; readonly minute: number; readonly span: Span };
 
 type Entry =
   | { readonly k: 'single'; readonly item: Item; readonly span: Span }
@@ -47,7 +48,7 @@ const VALUE_TOKENS: ReadonlySet<Token['t']> = new Set(['num', 'time', 'clock']);
 
 const join = (a: Span, b: Span): Span => ({ start: Math.min(a.start, b.start), end: Math.max(a.end, b.end) });
 
-const itemSpan = (item: Item): Span => (item.k === 'num' ? item.span : item.clock.span);
+const itemSpan = (item: Item): Span => (item.k === 'clock' ? item.clock.span : item.span);
 
 const weekdayOf = (value: number): Weekday => (((value % 7) + 7) % 7) as Weekday;
 
@@ -56,6 +57,7 @@ class Parser {
   private atContext = false;
   private readonly intervals = new Map<Unit, Interval>();
   private readonly times: Clock[] = [];
+  private readonly minuteMarks: Array<{ readonly minute: number; readonly span: Span }> = [];
   private window: TimeWindow | null = null;
   private weekdays: Tracked<Weekday> | null = null;
   private monthDays: Tracked<number> | null = null;
@@ -138,7 +140,7 @@ class Parser {
     offset += 1;
     for (;;) {
       const token = this.peek(offset);
-      if (token?.t === 'at' || (allowWeakTo && token?.t === 'to' && token.weak)) offset += 1;
+      if (token?.t === 'at' || (allowWeakTo && ((token?.t === 'to' && token.weak) || token?.t === 'from'))) offset += 1;
       else return offset;
     }
   }
@@ -288,6 +290,13 @@ class Parser {
         let span = token.span;
         let minute = 0;
         let explicit = false;
+        const minuteUnit = this.peek();
+        if (minuteUnit?.t === 'unit' && minuteUnit.unit === 'minute') {
+          this.index += 1;
+          span = join(span, minuteUnit.span);
+          if (token.value > 59) this.fail('OUT_OF_RANGE', `Minute ${token.value} is out of range 0-59`, span);
+          return { k: 'mark', minute: token.value, span };
+        }
         const hourUnit = this.peek();
         if (hourUnit?.t === 'unit' && hourUnit.unit === 'hour') {
           this.index += 1;
@@ -340,6 +349,19 @@ class Parser {
 
   private resolve(entries: readonly Entry[], at: boolean): void {
     const items = entries.flatMap((entry) => (entry.k === 'single' ? [entry.item] : [entry.from, entry.to]));
+    if (items.some((item) => item.k === 'mark')) {
+      for (const entry of entries) {
+        if (entry.k === 'range' || entry.item.k === 'clock' || (entry.item.k === 'num' && entry.item.ordinal)) {
+          this.fail('UNEXPECTED_TOKEN', `Expected minutes of the hour`, entry.span);
+        }
+        const item = entry.item;
+        const minute = item.k === 'mark' ? item.minute : item.value;
+        if (minute > 59) this.fail('OUT_OF_RANGE', `Minute ${minute} is out of range 0-59`, entry.span);
+        this.minuteMarks.push({ minute, span: entry.span });
+      }
+      return;
+    }
+
     const next = this.peek();
     const marked =
       next?.t === 'domMarker' || next?.t === 'month' || items.some((item) => item.k === 'num' && item.ordinal);
@@ -371,6 +393,7 @@ class Parser {
 
   private toClock(item: Item): Clock {
     if (item.k === 'clock') return item.clock;
+    if (item.k === 'mark') this.fail('UNEXPECTED_TOKEN', `Minutes of the hour cannot be a time of day`, item.span);
     if (item.ordinal) this.fail('UNEXPECTED_TOKEN', `Ordinal "${this.text(item.span)}" cannot be a time of day`, item.span);
     return this.makeClock(item.value, 0, item.span, null);
   }
@@ -482,6 +505,7 @@ class Parser {
     const days: number[] = [];
     const dayOf = (item: Item): number => {
       if (item.k === 'clock') this.fail('AMBIGUOUS', `"${this.text(item.clock.span)}" looks like a time, not a day`, item.clock.span);
+      if (item.k === 'mark') this.fail('AMBIGUOUS', `"${this.text(item.span)}" looks like minutes, not a day`, item.span);
       if (item.value < 1 || item.value > 31) this.fail('OUT_OF_RANGE', `Day ${item.value} is out of range 1-31`, item.span);
       return item.value;
     };
@@ -514,6 +538,8 @@ class Parser {
     const minutes = this.intervals.get('minute');
     const hours = this.intervals.get('hour');
     const window = this.window;
+    const [firstMark] = this.minuteMarks;
+    const marks = this.minuteMarks.map((mark) => mark.minute);
 
     if (minutes !== undefined || hours !== undefined) {
       const [firstTime] = this.times;
@@ -521,14 +547,23 @@ class Parser {
         this.fail('CONFLICT', `Specific times cannot be combined with a minute or hour interval`, firstTime.span);
       }
       if (minutes !== undefined) {
+        if (firstMark !== undefined) {
+          this.fail('CONFLICT', `Minutes of the hour cannot be combined with a minute interval`, firstMark.span);
+        }
         const hour = hours !== undefined ? this.steppedHours(hours.step, window) : window !== null ? this.minuteWindowHours(window) : ANY;
         return [stepField('minute', minutes.step), hour];
       }
-      return [valuesField([window?.from?.minute ?? 0]), this.steppedHours(hours?.step ?? 1, window)];
+      const minute = marks.length > 0 ? marks : [window?.from?.minute ?? 0];
+      return [valuesField(minute), this.steppedHours(hours?.step ?? 1, window)];
     }
 
     if (window !== null) {
       this.fail('INCOMPLETE', `A time range needs an interval, e.g. "every 15 minutes from 9 to 18"`, window.span);
+    }
+    if (firstMark !== undefined) {
+      const [firstTime] = this.times;
+      if (firstTime !== undefined) this.fail('CONFLICT', `Minutes of the hour cannot be combined with specific times`, firstMark.span);
+      return [valuesField(marks), ANY];
     }
     return this.clockFields();
   }

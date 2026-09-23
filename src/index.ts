@@ -15,17 +15,21 @@
  * - No dependencies, no LLM, fully deterministic
  * - Strict TypeScript types, errors carry a code and the position of the problem
  * - Refuses to guess: anything cron cannot express exactly is an error, not a silent approximation
+ * - Works both ways: {@link describe} turns cron back into natural text that parses to the same schedule
  *
  * ## Usage
  *
  * ```ts
- * import { nextRuns, parse, safeParse, toCron } from '@mrprolopstar/cronsense';
+ * import { describe, nextRuns, parse, safeParse, toCron } from '@mrprolopstar/cronsense';
  *
  * toCron('каждый день в 9 утра'); // '0 9 * * *'
  *
  * const schedule = parse('every 2 hours from 8:00 to 20:00');
  * schedule.cron;        // '0 8-20/2 * * *'
  * schedule.fields.hour; // { kind: 'step', from: 8, to: 20, step: 2 }
+ *
+ * describe('0 9 * * 1,3,5', { locale: 'ru' }); // 'по понедельникам, средам и пятницам в 9:00'
+ * describe('0 12 1,15 * *');                  // 'on the 1st and 15th at noon'
  *
  * nextRuns(schedule, { count: 3, timezone: 'utc' }); // [Date, Date, Date]
  *
@@ -102,6 +106,7 @@ export const toCron = (input: string, options: ParseOptions = {}): string => par
 
 export { parse };
 export { parseCron } from './cron.js';
+export { describe, type DescribeOptions, type Locale } from './describe.js';
 export { nextRuns } from './next.js';
 export { formatCron } from './field.js';
 export { CronsenseError, isCronsenseError, type ErrorCode } from './errors.js';
