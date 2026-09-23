@@ -86,5 +86,6 @@ export const formatField = (name: FieldName, field: CronField): string => {
   }
 };
 
+/** Formats structured fields into a cron expression. */
 export const formatCron = (fields: CronFields): string =>
   FIELD_ORDER.map((name) => formatField(name, fields[name])).join(' ');

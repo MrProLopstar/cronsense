@@ -32,6 +32,7 @@ const UTC: Calendar = {
   make: (year, month, day, hour, minute) => new Date(Date.UTC(year, month, day, hour, minute)),
 };
 
+/** Returns the upcoming run times of a schedule or a cron expression. */
 export const nextRuns = (schedule: Schedule | string, options: NextRunsOptions = {}): Date[] => {
   const fields: CronFields = typeof schedule === 'string' ? parseCron(schedule).fields : schedule.fields;
   const count = options.count ?? 5;

@@ -1,5 +1,6 @@
 import type { Span } from './types.js';
 
+/** Machine-readable reason a schedule could not be parsed. */
 export type ErrorCode =
   | 'EMPTY_INPUT'
   | 'UNKNOWN_WORD'
@@ -12,6 +13,7 @@ export type ErrorCode =
   | 'UNSUPPORTED'
   | 'INVALID_CRON';
 
+/** Error thrown by cronsense with a code and the position of the problem in the input. */
 export class CronsenseError extends Error {
   override readonly name = 'CronsenseError';
   readonly code: ErrorCode;
@@ -25,6 +27,7 @@ export class CronsenseError extends Error {
     this.span = span;
   }
 
+  /** Input followed by a line of `^` markers under the problematic part. */
   get excerpt(): string {
     if (this.span === null) return this.input;
     const width = Math.max(1, this.span.end - this.span.start);
@@ -32,5 +35,6 @@ export class CronsenseError extends Error {
   }
 }
 
+/** Type guard for {@link CronsenseError}. */
 export const isCronsenseError = (value: unknown): value is CronsenseError =>
   value instanceof CronsenseError;

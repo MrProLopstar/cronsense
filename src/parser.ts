@@ -620,5 +620,14 @@ class Parser {
   }
 }
 
+/**
+ * Parses a Russian or English schedule description into a cron expression.
+ *
+ * @example
+ * ```ts
+ * parse('по будням в 9:30').cron; // '30 9 * * 1-5'
+ * ```
+ * @throws {CronsenseError} when the text cannot be expressed exactly in cron.
+ */
 export const parse = (input: string, options: ParseOptions = {}): Schedule =>
   new Parser(input, tokenize(input), options).run();

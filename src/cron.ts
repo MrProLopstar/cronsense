@@ -19,6 +19,7 @@ const NAMES: Partial<Record<FieldName, readonly string[]>> = {
 
 const TERM = /^(\*|[a-z0-9]+(?:-[a-z0-9]+)?)(?:\/(\d+))?$/;
 
+/** Parses a 5-field cron expression or a macro such as `@daily` into a {@link Schedule}. */
 export const parseCron = (expression: string): Schedule => {
   const source = expression.trim().toLowerCase();
   const normalized = MACROS[source] ?? source;

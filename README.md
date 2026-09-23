@@ -18,7 +18,13 @@ mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
 ## Install
 
 ```bash
-npm install cronsense
+npx jsr add @mrprolopstar/cronsense
+```
+
+Or straight from GitHub:
+
+```bash
+npm install github:MrProLopstar/cronsense
 ```
 
 ## Usage
