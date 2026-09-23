@@ -1,6 +1,6 @@
 {
   "name": "cronsense",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Turn plain Russian or English schedules into cron expressions: «по будням в 9:30» → 30 9 * * 1-5",
   "keywords": [
     "cron",

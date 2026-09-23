@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +21,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npx jsr publish
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: '@mrprolopstar'
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          npm run build
+          npm pkg set name=@mrprolopstar/cronsense
+          npm publish --ignore-scripts
+          git checkout -- package.json
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
