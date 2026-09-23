@@ -191,6 +191,10 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 - Several times must form a grid (the same minutes for every hour): `9:00, 9:30, 18:00, 18:30` works, while `9:00 and 18:30` needs two schedules.
 - `nextRuns` supports local time and UTC and skips times that fall into a DST gap.
 
+## Versioning
+
+cronsense follows [semver](https://semver.org). The public API (`parse`, `safeParse`, `toCron`, `describe`, `parseCron`, `nextRuns`, `formatCron`, exported types and error codes) only changes in a major release. New vocabulary and new locales can make previously rejected phrases parse; that is not a breaking change. See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT

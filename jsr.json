@@ -1,13 +1,14 @@
 {
   "name": "@mrprolopstar/cronsense",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "license": "MIT",
   "exports": "./src/index.ts",
   "publish": {
     "include": [
       "src/**/*.ts",
       "README.md",
-      "LICENSE"
+      "LICENSE",
+      "CHANGELOG.md"
     ],
     "exclude": [
       "src/cli.ts",
