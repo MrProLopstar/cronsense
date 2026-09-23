@@ -32,6 +32,12 @@ mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
 npx jsr add @mrprolopstar/cronsense
 ```
 
+From GitHub Packages (needs a `.npmrc` line `@mrprolopstar:registry=https://npm.pkg.github.com` and a GitHub token with `read:packages`):
+
+```bash
+npm install @mrprolopstar/cronsense
+```
+
 Or straight from GitHub:
 
 ```bash
