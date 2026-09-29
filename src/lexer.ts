@@ -1,4 +1,5 @@
 import { CronsenseError } from './errors.js';
+import { matchHoliday, type Holiday } from './holidays.js';
 import { lookupWord, type Lexeme } from './lexicon.js';
 import type { Span } from './types.js';
 
@@ -8,6 +9,7 @@ export type Token =
   | Spanned<{ readonly t: 'num'; readonly value: number; readonly ordinal: boolean }>
   | Spanned<{ readonly t: 'time'; readonly hour: number; readonly minute: number; readonly padded: boolean }>
   | Spanned<{ readonly t: 'dash' }>
+  | Spanned<{ readonly t: 'holiday'; readonly holiday: Holiday }>
   | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'cardinal' | 'halfOf' | 'halfHour' | 'unsupported' }>>;
 
 export type TokenOf<K extends Token['t']> = Extract<Token, { readonly t: K }>;
@@ -61,6 +63,13 @@ export const tokenize = (input: string): Token[] => {
       const digits = number[1] ?? '';
       tokens.push({ t: 'num', value: Number(digits), ordinal: number[0].length > digits.length, span });
       index = span.end;
+      continue;
+    }
+
+    const named = matchHoliday(text, index);
+    if (named !== null) {
+      tokens.push({ t: 'holiday', holiday: named.holiday, span: { start: index, end: index + named.length } });
+      index += named.length;
       continue;
     }
 

@@ -12,6 +12,7 @@ export interface Plan {
   readonly byHour: readonly number[] | null;
   readonly byMinute: readonly number[] | null;
   readonly byEaster: readonly number[];
+  readonly byDates: readonly { readonly month: number; readonly day: number }[];
   readonly bySetPos: readonly number[];
   readonly setPosGroup: 'weekday' | 'workday' | null;
   readonly workdays: boolean;
@@ -84,6 +85,7 @@ class Parser {
   private readonly easterOffsets: number[] = [];
   private readonly easterWords = new Set<EasterCalendar>();
   private easterSpan: Span | null = null;
+  private readonly holidayDates: Array<{ readonly month: number; readonly day: number; readonly span: Span }> = [];
   private readonly setPositions: number[] = [];
   private setPosGroup: 'weekday' | 'workday' | null = null;
   private workdayFilter = false;
@@ -234,6 +236,9 @@ class Parser {
       case 'last':
         this.lastPhrase(token);
         return;
+      case 'holiday':
+        this.addHoliday(token, null);
+        return;
       case 'unit':
         if (at && token.unit === 'hour' && token.meridiem === undefined) {
           this.index -= 1;
@@ -241,11 +246,17 @@ class Parser {
           return;
         }
         this.unexpected(token);
+      case 'easterKind': {
+        const next = this.peek();
+        if (next?.t !== 'holiday') this.unexpected(token);
+        this.index += 1;
+        this.addHoliday(next, token.calendar);
+        return;
+      }
       case 'meridiem':
       case 'domMarker':
       case 'dash':
       case 'easter':
-      case 'easterKind':
       case 'after':
       case 'before':
         this.unexpected(token);
@@ -519,12 +530,17 @@ class Parser {
       next?.t === 'domMarker' || next?.t === 'month' || items.some((item) => item.k === 'num' && item.ordinal);
 
     if (marked) {
+      const { days, span } = this.dayValues(entries);
       this.take('domMarker');
-      this.addMonthDays(entries);
       this.takeUnit('day');
       this.takeUnit('month');
       const month = this.take('month');
-      if (month !== null) this.monthPhrase(month, false);
+      if (month === null) {
+        this.monthDays = this.track(this.monthDays, days, span);
+        return;
+      }
+      const names = this.collectNames(month, 12, 1);
+      this.addDatePairs(days, names.values, join(span, names.span));
       return;
     }
 
@@ -668,6 +684,42 @@ class Parser {
     return true;
   }
 
+  private addHoliday(token: TokenOf<'holiday'>, adjective: EasterCalendar | null): void {
+    const { rule } = token.holiday;
+    const calendar = this.options.easter ?? adjective ?? token.holiday.calendar;
+    if (rule.kind === 'fixed') {
+      const [month, day] = rule[calendar];
+      this.holidayDates.push({ month, day, span: token.span });
+      return;
+    }
+    this.rruleOnly('dates relative to Easter', token.span);
+    this.easterWords.add(calendar);
+    this.easterOffsets.push(...rule.offsets);
+    this.easterSpan = this.easterSpan === null ? token.span : join(this.easterSpan, token.span);
+  }
+
+  private applyHolidayDates(allowList: boolean): readonly { readonly month: number; readonly day: number }[] {
+    const dates = this.holidayDates;
+    const [first] = dates;
+    if (first === undefined) return [];
+    const span = join(first.span, dates.at(-1)?.span ?? first.span);
+    if (this.monthDays !== null || this.months !== null || this.weekdays !== null || this.lastDay || this.nthWeekdays.length > 0) {
+      this.fail('CONFLICT', `A holiday already fixes the date; remove the other day rules`, span);
+    }
+    const months = new Set(dates.map((date) => date.month));
+    const days = new Set(dates.map((date) => date.day));
+    const distinct = new Set(dates.map((date) => date.month * 100 + date.day));
+    if (this.easterOffsets.length === 0 && months.size * days.size === distinct.size) {
+      this.months = { values: months, span };
+      this.monthDays = { values: days, span };
+      return [];
+    }
+    if (!allowList) {
+      this.fail('UNSUPPORTED', `These holidays fall on different dates that one ${this.target === 'cron' ? 'cron expression' : 'RRULE'} cannot hold; split them or use occurrences`, span);
+    }
+    return [...distinct].map((value) => ({ month: Math.floor(value / 100), day: value % 100 }));
+  }
+
   private easterCalendar(): EasterCalendar {
     if (this.options.easter !== undefined) return this.options.easter;
     if (this.easterWords.size > 1) this.fail('CONFLICT', `Both Orthodox and Western Easter are mentioned`, this.easterSpan);
@@ -736,15 +788,25 @@ class Parser {
 
   private monthPhrase(first: TokenOf<'month'>, allowDays: boolean): void {
     const { values, span } = this.collectNames(first, 12, 1);
-    this.months = this.track(this.months, values, span);
     if (allowDays && this.kindAt(0) === 'num') {
-      const entries = this.entries();
+      const { days, span: daySpan } = this.dayValues(this.entries());
       this.take('domMarker');
-      this.addMonthDays(entries);
+      this.addDatePairs(days, values, join(span, daySpan));
+      return;
+    }
+    this.months = this.track(this.months, values, span);
+  }
+
+  private addDatePairs(days: readonly number[], months: readonly number[], span: Span): void {
+    for (const month of months) {
+      for (const day of days) {
+        if (day > (DAYS_IN_MONTH[month - 1] ?? 31)) this.fail('OUT_OF_RANGE', `Day ${day} never occurs in month ${month}`, span);
+        this.holidayDates.push({ month, day, span });
+      }
     }
   }
 
-  private addMonthDays(entries: readonly Entry[]): void {
+  private dayValues(entries: readonly Entry[]): { readonly days: number[]; readonly span: Span } {
     const days: number[] = [];
     const dayOf = (item: Item): number => {
       if (item.k === 'clock') this.fail('AMBIGUOUS', `"${this.text(item.clock.span)}" looks like a time, not a day`, item.clock.span);
@@ -763,7 +825,7 @@ class Parser {
       for (let day = from; day <= to; day += 1) days.push(day);
     }
     const span = join(entries[0]?.span ?? { start: 0, end: 0 }, entries.at(-1)?.span ?? { start: 0, end: 0 });
-    this.monthDays = this.track(this.monthDays, days, span);
+    return { days, span };
   }
 
   private track<T>(current: Tracked<T> | null, values: readonly T[], span: Span): Tracked<T> {
@@ -773,6 +835,7 @@ class Parser {
   }
 
   private build(): CronFields {
+    this.applyHolidayDates(false);
     const [minute, hour] = this.timeFields();
     return { minute, hour, ...this.dayFields() };
   }
@@ -897,7 +960,8 @@ class Parser {
     return { dayOfMonth, month, dayOfWeek };
   }
 
-  plan(): Plan {
+  plan(allowDateList = true): Plan {
+    const byDates = this.applyHolidayDates(allowDateList);
     const interval = (unit: Unit): Interval | undefined => this.intervals.get(unit);
     const minutes = interval('minute');
     const hours = interval('hour');
@@ -951,7 +1015,7 @@ class Parser {
         if (coarse !== undefined) {
           freq = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }[coarse];
           step = coarseStep;
-        } else if (this.easterOffsets.length > 0) freq = 'YEARLY';
+        } else if (this.easterOffsets.length > 0 || byDates.length > 0) freq = 'YEARLY';
         else if (nth.length > 0 || this.setPositions.length > 0) freq = 'MONTHLY';
         else if (months !== null && (monthDays !== null || this.lastDay) && weekdays === null) freq = 'YEARLY';
         else if (monthDays !== null || this.lastDay) freq = 'MONTHLY';
@@ -983,10 +1047,10 @@ class Parser {
     }
     const easter = this.easterOffsets.length > 0;
     const weekly = freq === 'WEEKLY' || coarse === 'week';
-    const monthly = !easter && (freq === 'MONTHLY' || freq === 'YEARLY' || coarse === 'month' || coarse === 'year');
+    const monthly = !easter && byDates.length === 0 && (freq === 'MONTHLY' || freq === 'YEARLY' || coarse === 'month' || coarse === 'year');
     if (weekly && byDay.length === 0 && byMonthDay.length === 0) byDay.push({ nth: null, day: this.options.weeklyOn ?? 0 });
     if (monthly && byMonthDay.length === 0 && byDay.length === 0 && this.setPositions.length === 0) byMonthDay.push(1);
-    if (!easter && (freq === 'YEARLY' || coarse === 'year') && byMonth.length === 0 && byMonthDay.length > 0 && byDay.length === 0) byMonth.push(1);
+    if (!easter && byDates.length === 0 && (freq === 'YEARLY' || coarse === 'year') && byMonth.length === 0 && byMonthDay.length > 0 && byDay.length === 0) byMonth.push(1);
 
     if (monthDays !== null && months !== null) {
       const longest = Math.max(...[...months.values].map((value) => DAYS_IN_MONTH[value - 1] ?? 31));
@@ -1006,6 +1070,7 @@ class Parser {
       byHour: allHours ? null : numbers(byHour),
       byMinute: numbers(byMinute),
       byEaster: [...this.easterOffsets],
+      byDates,
       bySetPos: [...this.setPositions],
       setPosGroup: this.setPosGroup,
       workdays: this.workdayFilter,
@@ -1014,7 +1079,10 @@ class Parser {
   }
 
   private rrule(): string {
-    const plan = this.plan();
+    if (this.easterOffsets.length > 0 && this.holidayDates.length > 0) {
+      this.fail('UNSUPPORTED', `Fixed holidays and Easter-based holidays cannot share one RRULE; split them or use occurrences`, this.easterSpan);
+    }
+    const plan = this.plan(false);
     if (plan.byEaster.length > 0) {
       if (plan.easter === 'orthodox') {
         this.fail('UNSUPPORTED', `RRULE BYEASTER (rrule.js, python-dateutil) only knows Western Easter; use occurrences() for Orthodox Easter`, this.easterSpan);

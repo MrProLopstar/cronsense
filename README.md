@@ -142,6 +142,24 @@ easterDate(2026, 'orthodox');                                  // { month: 4, da
 
 `BYEASTER` is a non-standard extension of rrule.js and python-dateutil that only knows Western Easter, so `toRRule` refuses Orthodox Easter and points to `occurrences`. Cron cannot express Easter at all.
 
+## Holidays
+
+Named holidays work in every format that can express them:
+
+```ts
+toCron('в День Победы в 10 утра');                // '0 10 9 5 *'
+toCron('в Рождество');                            // '0 0 7 1 *'
+toCron('в католическое Рождество');               // '0 0 25 12 *'
+occurrences('в Троицу', { from, to });            // 2026-05-31
+occurrences('на Масленицу', { from, to });        // the whole week, 2026-02-16 to 2026-02-22
+occurrences('на 23 февраля и 8 марта', { from, to }); // exactly two dates
+toRRule('good friday');                           // 'FREQ=YEARLY;...;BYEASTER=-2'
+```
+
+Covered: Russian public holidays (Новый год, День защитника Отечества, 8 Марта, Праздник Весны и Труда, День Победы, День России, День народного единства, День знаний), Orthodox holidays (Рождество, Крещение, Масленица, Прощёное воскресенье, Чистый понедельник, Вербное воскресенье, Страстная пятница, Радоница, Вознесение, Троица, Духов день) and Western ones (Christmas, Epiphany, Shrove Tuesday, Ash Wednesday, Palm Sunday, Good Friday, Easter Monday, Ascension, Pentecost, Corpus Christi, Halloween). Russian names use the Orthodox calendar by default, English names the Western one; «католическое», «православное» and the `easter` option switch it.
+
+Fixed dates that do not form a grid («23 февраля и 8 марта») are listed exactly in `occurrences`; cron and RRULE refuse them rather than fire on extra days.
+
 ## With your scheduler
 
 cronsense only produces cron strings, so it works with any scheduler:

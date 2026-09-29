@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.6.0
+
+- Named holidays: Russian public holidays, Orthodox and Western church holidays, fixed and Easter-based, with the calendar picked by language or by «католическое» / «православное» / the `easter` option
+- Fix: «23 февраля и 8 марта» used to produce `0 0 8,23 2,3 *`, which also fired on February 8 and March 23. Day-and-month phrases are now exact dates: a grid still becomes cron, anything else is listed exactly by `occurrences` and refused by cron and RRULE
+- Playground: holiday examples
+
 ## 1.5.0
 
 - Working days: «в первый рабочий день месяца», «в последний рабочий день месяца», «в третий рабочий день», «по рабочим дням» in `occurrences` with an `isWorkday` predicate, for example from `@mrprolopstar/prodcal`

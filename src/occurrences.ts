@@ -121,7 +121,8 @@ export const occurrences = (input: string, options: OccurrenceOptions): Date[] =
     ) {
       return false;
     }
-    if (plan.byEaster.length > 0 && !plan.byEaster.includes(serial - easterDay(year))) return false;
+    const holidays = plan.byEaster.length > 0 || plan.byDates.length > 0;
+    if (holidays && !plan.byEaster.includes(serial - easterDay(year)) && !plan.byDates.some((date) => date.month === month && date.day === day)) return false;
     if (plan.interval > 1) {
       if (serial < anchorDay) return false;
       if (plan.freq === 'DAILY') return (serial - anchorDay) % plan.interval === 0;
