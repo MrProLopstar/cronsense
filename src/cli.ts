@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { CronsenseError } from './errors.js';
 import { nextRuns } from './next.js';
-import { parse } from './parser.js';
+import { parse, toRRule } from './parser.js';
 import { parseCron } from './cron.js';
 import { describe } from './describe.js';
 import type { Schedule, Timezone, Weekday } from './types.js';
@@ -20,6 +20,7 @@ Options:
   -n, --next <count>   Print the next <count> run times
       --utc            Compute run times in UTC instead of local time
       --cron           Treat input as a cron expression
+      --rrule          Print an iCalendar RRULE instead of cron
   -e, --explain        Print a natural-language description
       --locale <ru|en> Language of the description (default en)
       --weekly-on <d>  Weekday for "weekly" (0-6, Sunday = 0; default 0)
@@ -56,6 +57,7 @@ const main = (argv: readonly string[]): number => {
       next: { type: 'string', short: 'n' },
       utc: { type: 'boolean', default: false },
       cron: { type: 'boolean', default: false },
+      rrule: { type: 'boolean', default: false },
       explain: { type: 'boolean', short: 'e', default: false },
       locale: { type: 'string' },
       'weekly-on': { type: 'string' },
@@ -86,7 +88,13 @@ const main = (argv: readonly string[]): number => {
   const locale = values.locale ?? 'en';
   if (locale !== 'ru' && locale !== 'en') throw new RangeError('--locale must be "ru" or "en"');
   const timezone: Timezone = values.utc ? 'utc' : 'local';
-  const schedule: Schedule = values.cron ? parseCron(input) : parse(input, { strictHours: values['strict-hours'], ...(weeklyOn === undefined ? {} : { weeklyOn }) });
+  const options = { strictHours: values['strict-hours'], ...(weeklyOn === undefined ? {} : { weeklyOn }) };
+  if (values.rrule) {
+    process.stdout.write(`${toRRule(input, options)}
+`);
+    return 0;
+  }
+  const schedule: Schedule = values.cron ? parseCron(input) : parse(input, options);
   const runs = count === undefined ? [] : nextRuns(schedule, { count, timezone });
   const description = values.explain ? describe(schedule, { locale }) : null;
 

@@ -86,6 +86,20 @@ npx cronsense --json "1 числа каждого месяца"
 npx cronsense --cron --explain --locale ru "0 9 * * 1,3,5"
 ```
 
+## RRULE
+
+`toRRule` строит iCalendar RRULE (RFC 5545) из тех же фраз и принимает то, чего cron не умеет:
+
+```ts
+toRRule('в последний день месяца в 18:00');       // 'FREQ=MONTHLY;BYMONTHDAY=-1;BYHOUR=18;BYMINUTE=0'
+toRRule('в первый понедельник месяца в 9:30');    // 'FREQ=MONTHLY;BYDAY=1MO;BYHOUR=9;BYMINUTE=30'
+toRRule('каждые 2 недели по понедельникам в 10'); // 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;BYHOUR=10;BYMINUTE=0'
+toRRule('каждые 90 минут');                       // 'FREQ=MINUTELY;INTERVAL=90'
+toRRule('по понедельникам 1 числа');              // 'FREQ=MONTHLY;BYMONTHDAY=1;BYDAY=MO;...', понедельник И 1 число
+```
+
+Шаги, которые делят час или сутки нацело («каждые 15 минут», «каждые 2 часа»), превращаются в явные списки `BYMINUTE`/`BYHOUR` и не зависят от `DTSTART`. `INTERVAL` используется только для настоящих интервалов («каждые 90 минут», «каждые 3 дня», «каждые 2 недели»), они отсчитываются от `DTSTART`. Тесты сверяют правила с [rrule.js](https://github.com/jkbrzt/rrule) по каждому запуску. В CLI: `--rrule`, в MCP: `to_rrule`.
+
 ## С вашим планировщиком
 
 cronsense выдаёт обычные cron-строки, поэтому подходит к любому планировщику:
@@ -152,6 +166,7 @@ Claude Desktop, Cursor и другие клиенты (конфиг `mcpServers`
 | `parseCron(expression)` | Разбирает cron из 5 полей или макрос (`@daily` и т. п.) в `Schedule` |
 | `nextRuns(schedule \| expression, options?)` | Ближайшие запуски; опции: `count` (по умолчанию 5), `from`, `timezone` (`'local'` или `'utc'`) |
 | `describe(schedule \| expression, options?)` | Описание словами; `locale`: `'en'` (по умолчанию) или `'ru'` |
+| `toRRule(text, options?)` | Строка iCalendar RRULE, см. [RRULE](#rrule) |
 | `formatCron(fields)` | Собирает cron-строку из структурированных полей |
 
 `ParseOptions.strictHours` отклоняет часы от 1 до 12 без «утра»/«вечера» или am/pm с ошибкой `AMBIGUOUS` и не считает их утренними: «без шести семь» не пройдёт, а «без шести семь вечера», «в 19:00» и «в 09:30» пройдут. Включайте там, где ошибиться дорого, например в ботах-напоминалках. В CLI: `--strict-hours`, в MCP: `strictHours`.

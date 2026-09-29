@@ -86,6 +86,20 @@ npx cronsense --json "1 числа каждого месяца"
 npx cronsense --cron --explain --locale ru "0 9 * * 1,3,5"
 ```
 
+## RRULE
+
+`toRRule` builds an iCalendar RRULE (RFC 5545) from the same phrases, and also accepts what cron cannot express:
+
+```ts
+toRRule('в последний день месяца в 18:00');       // 'FREQ=MONTHLY;BYMONTHDAY=-1;BYHOUR=18;BYMINUTE=0'
+toRRule('в первый понедельник месяца в 9:30');    // 'FREQ=MONTHLY;BYDAY=1MO;BYHOUR=9;BYMINUTE=30'
+toRRule('каждые 2 недели по понедельникам в 10'); // 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;BYHOUR=10;BYMINUTE=0'
+toRRule('каждые 90 минут');                       // 'FREQ=MINUTELY;INTERVAL=90'
+toRRule('по понедельникам 1 числа');              // 'FREQ=MONTHLY;BYMONTHDAY=1;BYDAY=MO;...', Monday AND the 1st
+```
+
+Steps that divide the hour or the day (every 15 minutes, every 2 hours) become explicit `BYMINUTE`/`BYHOUR` lists, so they do not depend on `DTSTART`. Only true intervals (every 90 minutes, every 3 days, every 2 weeks) use `INTERVAL` and count from `DTSTART`. Tests compare the rules with [rrule.js](https://github.com/jkbrzt/rrule) occurrence by occurrence. CLI: `--rrule`; MCP: `to_rrule`.
+
 ## With your scheduler
 
 cronsense only produces cron strings, so it works with any scheduler:
@@ -152,6 +166,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 | `parseCron(expression)` | Parses a 5-field cron expression or macro (`@daily`, …) into a `Schedule` |
 | `nextRuns(schedule \| expression, options?)` | Next run times; options: `count` (default 5), `from`, `timezone` (`'local'` or `'utc'`) |
 | `describe(schedule \| expression, options?)` | Natural-language description; `locale`: `'en'` (default) or `'ru'` |
+| `toRRule(text, options?)` | iCalendar RRULE string, see [RRULE](#rrule) |
 | `formatCron(fields)` | Formats structured fields back into a cron string |
 
 `ParseOptions.strictHours` rejects hours 1–12 without «утра»/«вечера» or am/pm with `AMBIGUOUS` instead of reading them as morning: «без шести семь» fails, «без шести семь вечера», «в 19:00» and «в 09:30» pass. Use it where a wrong guess is costly, for example in reminder bots. CLI: `--strict-hours`; MCP: `strictHours`.

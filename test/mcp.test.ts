@@ -54,6 +54,14 @@ describe('mcp server', () => {
     });
   });
 
+  it('converts text to RRULE', () => {
+    expect(call('to_rrule', { text: 'в последний день месяца в 18:00' })).toMatchObject({
+      structuredContent: { rrule: 'FREQ=MONTHLY;BYMONTHDAY=-1;BYHOUR=18;BYMINUTE=0' },
+      isError: false,
+    });
+    expect(call('to_rrule', { text: 'кроме пятницы' })).toMatchObject({ isError: true });
+  });
+
   it('supports strictHours', () => {
     expect(call('to_cron', { text: 'без шести семь', strictHours: true })).toMatchObject({ structuredContent: { code: 'AMBIGUOUS' }, isError: true });
     expect(call('to_cron', { text: 'без шести семь вечера', strictHours: true })).toMatchObject({ structuredContent: { cron: '54 18 * * *' }, isError: false });

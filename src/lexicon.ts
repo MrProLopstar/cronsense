@@ -10,6 +10,7 @@ export type Lexeme =
   | { readonly t: 'half' }
   | { readonly t: 'quarter' }
   | { readonly t: 'without' }
+  | { readonly t: 'last' }
   | { readonly t: 'unit'; readonly unit: Unit; readonly meridiem?: Meridiem }
   | { readonly t: 'freq'; readonly unit: Unit }
   | { readonly t: 'dow'; readonly days: readonly Weekday[] }
@@ -120,7 +121,7 @@ const RULES: readonly Rule[] = [
 
   [/^(?:the|of|o|clock|ровно|дни|дням|днями|also|также|past)$/, { t: 'noise' }],
 
-  [/^(?:последн[а-я]*|last)$/, { t: 'unsupported', feature: 'last day / last weekday of month' }],
+  [/^(?:последн[а-я]*|last)$/, { t: 'last' }],
   [/^(?:секунд[а-я]*|seconds?|secs?)$/, { t: 'unsupported', feature: 'second-level precision' }],
   [/^(?:кроме|except|excluding)$/, { t: 'unsupported', feature: 'exclusions' }],
   [/^(?:десятилет[а-я]*|век[аеу]?|веков|столет[а-я]*|decades?|centur(?:y|ies))$/, { t: 'unsupported', feature: 'intervals longer than a year' }],

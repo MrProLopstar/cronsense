@@ -2,7 +2,7 @@ import { parseCron } from '../cron.js';
 import { describe } from '../describe.js';
 import { CronsenseError } from '../errors.js';
 import { nextRuns } from '../next.js';
-import { parse } from '../parser.js';
+import { parse, toRRule } from '../parser.js';
 import type { Schedule, Weekday } from '../types.js';
 
 export type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
@@ -39,6 +39,22 @@ const TOOLS: Json = [
         weeklyOn: { type: 'integer', minimum: 0, maximum: 6, description: 'Weekday for "weekly" (0 = Sunday, default)' },
         strictHours: { type: 'boolean', description: 'Reject hours 1-12 without morning/evening or am/pm instead of assuming morning' },
         locale: { type: 'string', enum: ['ru', 'en'], description: 'Language of the returned description (default en)' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'to_rrule',
+    title: 'Schedule text to RRULE',
+    description:
+      'Convert a Russian or English schedule description into an iCalendar RRULE (RFC 5545). Supports what cron cannot: every N weeks, the last day of the month, the Nth weekday.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Schedule description in Russian or English' },
+        weeklyOn: { type: 'integer', minimum: 0, maximum: 6, description: 'Weekday for "weekly" (0 = Sunday, default)' },
+        strictHours: { type: 'boolean', description: 'Reject hours 1-12 without morning/evening or am/pm instead of assuming morning' },
       },
       required: ['text'],
       additionalProperties: false,
@@ -137,6 +153,14 @@ const callTool = (name: string, args: Args): ToolResult => {
       const schedule = parse(text, { strictHours: strict === true, ...(weeklyOn === undefined ? {} : { weeklyOn }) });
       const result = summary(schedule, locale);
       return success(`${schedule.cron}\n${String(result['description'])}`, result);
+    }
+    case 'to_rrule': {
+      const text = requiredString(args, 'text');
+      const weeklyOn = optionalInteger(args, 'weeklyOn', 0, 6) as Weekday | undefined;
+      const strict = args['strictHours'];
+      if (strict !== undefined && typeof strict !== 'boolean') throw new ParamsError('"strictHours" must be a boolean');
+      const rrule = toRRule(text, { strictHours: strict === true, ...(weeklyOn === undefined ? {} : { weeklyOn }) });
+      return success(rrule, { rrule });
     }
     case 'describe_cron': {
       const schedule = parseCron(requiredString(args, 'cron'));

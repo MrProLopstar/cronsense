@@ -107,6 +107,7 @@ export const safeParse = (input: string, options: ParseOptions = {}): SafeParseR
 export const toCron = (input: string, options: ParseOptions = {}): string => parse(input, options).cron;
 
 export { parse };
+export { toRRule } from './parser.js';
 export { parseCron } from './cron.js';
 export { describe, type DescribeOptions, type Locale } from './describe.js';
 export { nextRuns } from './next.js';

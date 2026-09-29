@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.3.0
+
+- `toRRule`: iCalendar RRULE output, including every N weeks, the last day of the month («в последний день месяца»), the Nth weekday («в первый понедельник месяца», «в последнюю пятницу»), intervals longer than cron allows and day-of-month AND weekday
+- CLI `--rrule`, MCP tool `to_rrule`
+- Conflicting intervals such as «еженедельно и ежемесячно» are rejected
+- Tests check every RRULE against rrule.js
+
 ## 1.2.0
 
 - `strictHours` option: hours 1–12 without «утра»/«вечера» or am/pm fail with `AMBIGUOUS` instead of being read as morning; `--strict-hours` in the CLI, `strictHours` in the MCP `to_cron` tool

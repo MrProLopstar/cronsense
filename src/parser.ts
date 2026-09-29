@@ -1,5 +1,5 @@
 import { CronsenseError, type ErrorCode } from './errors.js';
-import { ANY, DAYS_IN_MONTH, formatCron, stepField, valuesField } from './field.js';
+import { ANY, DAYS_IN_MONTH, expandField, formatCron, stepField, valuesField } from './field.js';
 import { tokenize, type Token, type TokenOf } from './lexer.js';
 import type { CronField, CronFields, Meridiem, ParseOptions, Schedule, Span, Unit, Weekday } from './types.js';
 
@@ -64,17 +64,34 @@ class Parser {
   private monthDays: Tracked<number> | null = null;
   private months: Tracked<number> | null = null;
 
+  private readonly nthWeekdays: Array<{ readonly nth: number; readonly day: Weekday }> = [];
+  private lastDay = false;
+
   constructor(
     private readonly input: string,
     private readonly tokens: readonly Token[],
     private readonly options: ParseOptions,
+    private readonly target: 'cron' | 'rrule' = 'cron',
   ) {}
 
   run(): Schedule {
-    if (this.tokens.length === 0) this.fail('EMPTY_INPUT', 'Schedule description is empty', null);
-    while (this.peek() !== undefined) this.clause();
+    this.consume();
     const fields = this.build();
     return { cron: formatCron(fields), fields };
+  }
+
+  runRRule(): string {
+    this.consume();
+    return this.rrule();
+  }
+
+  private consume(): void {
+    if (this.tokens.length === 0) this.fail('EMPTY_INPUT', 'Schedule description is empty', null);
+    while (this.peek() !== undefined) this.clause();
+  }
+
+  private rruleOnly(feature: string, span: Span): void {
+    if (this.target === 'cron') this.fail('UNSUPPORTED', `Not expressible in cron: ${feature}; use toRRule`, span);
   }
 
   private fail(code: ErrorCode, message: string, span: Span | null): never {
@@ -187,6 +204,9 @@ class Parser {
         this.index -= 1;
         this.valueList(at);
         return;
+      case 'last':
+        this.lastPhrase(token);
+        return;
       case 'unit':
         if (at && token.unit === 'hour' && token.meridiem === undefined) {
           this.index -= 1;
@@ -234,9 +254,10 @@ class Parser {
       }
       case 'dow':
       case 'month':
-        if (step !== 1) {
+        if (step !== 1 && (token.t === 'month' || this.target === 'cron')) {
           this.fail('UNSUPPORTED', `"Every other" is only supported with minutes, hours, days and months`, join(start, token.span));
         }
+        if (step !== 1) this.addInterval('week', step, join(start, token.span));
         this.advance();
         if (token.t === 'dow') this.weekdayList(token);
         else this.monthPhrase(token, true);
@@ -248,12 +269,19 @@ class Parser {
 
   private addInterval(unit: Unit, step: number, span: Span): void {
     if (!Number.isInteger(step) || step < 1) this.fail('OUT_OF_RANGE', `Interval must be a positive whole number`, span);
-    const max = MAX_STEP[unit];
+    const max = this.target === 'rrule' ? Number.MAX_SAFE_INTEGER : MAX_STEP[unit];
     if (step > max) {
       if (max === 1) this.fail('UNSUPPORTED', `Cron cannot repeat every ${step} ${unit}s`, span);
       const hint = unit === 'minute' && step % 60 === 0 ? `; use "every ${step / 60} hours"` : '';
       this.fail('OUT_OF_RANGE', `Every ${step} ${unit}s exceeds the maximum of ${max}${hint}`, span);
     }
+    const coarse: readonly Unit[] = ['day', 'week', 'month', 'year'];
+    const combinable = (entry: Interval): boolean =>
+      this.target === 'cron' && entry.step > 1 && step > 1 && ![entry.unit, unit].some((value) => value === 'week' || value === 'year');
+    const other = coarse.includes(unit)
+      ? [...this.intervals.values()].find((entry) => entry.unit !== unit && coarse.includes(entry.unit) && !combinable(entry))
+      : undefined;
+    if (other !== undefined) this.fail('CONFLICT', `"${this.text(other.span)}" and "${this.text(span)}" are conflicting intervals`, span);
     const existing = this.intervals.get(unit);
     if (existing !== undefined && existing.step !== step) {
       this.fail('CONFLICT', `Conflicting ${unit} intervals`, span);
@@ -444,6 +472,12 @@ class Parser {
       return;
     }
 
+    const nthDay = this.peek();
+    if (nthDay?.t === 'dow' && entries.every((entry) => entry.k === 'single' && entry.item.k === 'num' && entry.item.ordinal)) {
+      this.nthWeekday(items.map((item) => (item.k === 'num' ? item.value : 0)), nthDay);
+      return;
+    }
+
     const next = this.peek();
     const marked =
       next?.t === 'domMarker' || next?.t === 'month' || items.some((item) => item.k === 'num' && item.ordinal);
@@ -569,6 +603,36 @@ class Parser {
       current = this.expect(kind, 'a name');
       span = join(span, current.span);
     }
+  }
+
+  private nthWeekday(nths: readonly number[], dow: TokenOf<'dow'>): void {
+    this.index += 1;
+    const [day] = dow.days;
+    if (dow.days.length !== 1 || day === undefined) this.fail('UNEXPECTED_TOKEN', `Expected a single weekday after an ordinal`, dow.span);
+    this.rruleOnly('Nth weekday of the month', dow.span);
+    for (const nth of nths) {
+      if (nth < 1 || nth > 5) this.fail('OUT_OF_RANGE', `A month has at most 5 of each weekday`, dow.span);
+      this.nthWeekdays.push({ nth, day: weekdayOf(day) });
+    }
+    this.takeUnit('month');
+  }
+
+  private lastPhrase(token: TokenOf<'last'>): void {
+    const next = this.peek();
+    if (next?.t === 'dow') {
+      this.nthWeekday([], next);
+      const [day] = next.days;
+      if (day !== undefined) this.nthWeekdays.push({ nth: -1, day: weekdayOf(day) });
+      return;
+    }
+    if ((next?.t === 'unit' && next.unit === 'day') || next?.t === 'domMarker') {
+      this.index += 1;
+      this.rruleOnly('last day of the month', join(token.span, next.span));
+      this.lastDay = true;
+      this.takeUnit('month');
+      return;
+    }
+    this.fail('INCOMPLETE', `Expected a weekday or «день» after "${this.text(token.span)}"`, token.span);
   }
 
   private weekdayList(first: TokenOf<'dow'>): void {
@@ -701,7 +765,7 @@ class Parser {
     let dayOfWeek: CronField = weekdays === null || weekdays.values.size === 7 ? ANY : valuesField(weekdays.values);
     let month: CronField = months === null || months.values.size === 12 ? ANY : valuesField(months.values);
 
-    if (weekdays !== null && monthDays !== null) {
+    if (weekdays !== null && monthDays !== null && this.target === 'cron') {
       this.fail('CONFLICT', `Cron treats day-of-month and weekday as "either", so they cannot be combined`, join(weekdays.span, monthDays.span));
     }
 
@@ -739,6 +803,108 @@ class Parser {
 
     return { dayOfMonth, month, dayOfWeek };
   }
+
+  private rrule(): string {
+    const interval = (unit: Unit): Interval | undefined => this.intervals.get(unit);
+    const minutes = interval('minute');
+    const hours = interval('hour');
+    const { weekdays, monthDays, months, window } = this;
+    const nth = this.nthWeekdays;
+    const [firstTime] = this.times;
+    const [firstMark] = this.minuteMarks;
+    const marks = this.minuteMarks.map((mark) => mark.minute);
+    const list = (values: Iterable<number>): string => [...new Set(values)].sort((a, b) => a - b).join(',');
+    const hoursOf = (field: CronField): number[] => [...expandField('hour', field)];
+    const parts: string[] = [];
+    let byHour: string | null = null;
+    let byMinute: string | null = null;
+    let freq: string;
+    let step = 1;
+    const coarse = (['day', 'week', 'month', 'year'] as const).find((unit) => interval(unit) !== undefined);
+    const coarseStep = coarse === undefined ? 1 : (interval(coarse)?.step ?? 1);
+
+    if ((minutes !== undefined || hours !== undefined) && firstTime !== undefined) {
+      this.fail('CONFLICT', `Specific times cannot be combined with a minute or hour interval`, firstTime.span);
+    }
+    if (minutes !== undefined) {
+      if (firstMark !== undefined) this.fail('CONFLICT', `Minutes of the hour cannot be combined with a minute interval`, firstMark.span);
+      const aligned = 60 % minutes.step === 0;
+      freq = minutes.step === 1 ? 'MINUTELY' : aligned ? 'HOURLY' : 'MINUTELY';
+      if (aligned && minutes.step > 1) byMinute = list(expandField('minute', stepField('minute', minutes.step)));
+      else step = minutes.step;
+      if (hours !== undefined) byHour = list(hoursOf(this.steppedHours(hours.step, window)));
+      else if (window !== null) byHour = list(hoursOf(this.minuteWindowHours(window)));
+    } else if (hours !== undefined) {
+      byMinute = list(marks.length > 0 ? marks : [window?.from?.minute ?? 0]);
+      if (24 % hours.step === 0) {
+        freq = hours.step === 1 ? 'HOURLY' : 'DAILY';
+        byHour = list(hoursOf(this.steppedHours(hours.step, window)));
+      } else {
+        freq = 'HOURLY';
+        step = hours.step;
+        if (window !== null) byHour = list(hoursOf(this.steppedHours(1, window)));
+      }
+    } else {
+      if (window !== null) this.fail('INCOMPLETE', `A time range needs an interval, e.g. "every 15 minutes from 9 to 18"`, window.span);
+      if (firstMark !== undefined && firstTime !== undefined) {
+        this.fail('CONFLICT', `Minutes of the hour cannot be combined with specific times`, firstMark.span);
+      }
+      if (firstMark !== undefined) {
+        freq = 'HOURLY';
+        byMinute = list(marks);
+      } else {
+        const [minute, hour] = this.clockFields();
+        byMinute = list(expandField('minute', minute));
+        byHour = list(expandField('hour', hour));
+        if (coarse !== undefined) {
+          freq = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }[coarse];
+          step = coarseStep;
+        } else if (nth.length > 0) freq = 'MONTHLY';
+        else if (months !== null && (monthDays !== null || this.lastDay) && weekdays === null) freq = 'YEARLY';
+        else if (monthDays !== null || this.lastDay) freq = 'MONTHLY';
+        else if (weekdays !== null) freq = 'WEEKLY';
+        else freq = 'DAILY';
+      }
+    }
+
+    if (nth.length > 0 && freq !== 'MONTHLY' && freq !== 'YEARLY') {
+      this.fail('CONFLICT', `An Nth weekday needs a monthly or yearly schedule`, this.intervals.values().next().value?.span ?? null);
+    }
+
+    const byMonth = months === null || months.values.size === 12 ? null : list(months.values);
+    const days = [...(monthDays?.values ?? [])].sort((a, b) => a - b).map(String);
+    if (this.lastDay) days.push('-1');
+    const names = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+    const byDay = [
+      ...[...(weekdays?.values ?? [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((day) => names[day] ?? ''),
+      ...nth.map(({ nth: index, day }) => `${index}${names[day] ?? ''}`),
+    ];
+    const finer = !['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq) || (coarse !== undefined && freq === 'DAILY' && coarse !== 'day');
+    if (finer && coarse !== undefined && coarseStep > 1) {
+      this.fail('UNSUPPORTED', `An interval of several ${coarse}s cannot be combined with minutes or hours in one RRULE`, interval(coarse)?.span ?? null);
+    }
+    const weekly = freq === 'WEEKLY' || coarse === 'week';
+    const monthly = freq === 'MONTHLY' || freq === 'YEARLY' || coarse === 'month' || coarse === 'year';
+    if (weekly && byDay.length === 0 && days.length === 0) byDay.push(names[this.options.weeklyOn ?? 0] ?? 'SU');
+    if (monthly && days.length === 0 && byDay.length === 0) days.push('1');
+
+    if (monthDays !== null && months !== null) {
+      const longest = Math.max(...[...months.values].map((value) => DAYS_IN_MONTH[value - 1] ?? 31));
+      if ([...monthDays.values].every((value) => value > longest) && !this.lastDay) {
+        this.fail('OUT_OF_RANGE', `Day ${[...monthDays.values].join(', ')} never occurs in the selected month(s)`, monthDays.span);
+      }
+    }
+
+    parts.push(`FREQ=${freq}`);
+    if (step > 1) parts.push(`INTERVAL=${step}`);
+    if ((freq === 'YEARLY' || coarse === 'year') && byMonth === null && days.length > 0 && byDay.length === 0) parts.push('BYMONTH=1');
+    if (byMonth !== null) parts.push(`BYMONTH=${byMonth}`);
+    if (days.length > 0) parts.push(`BYMONTHDAY=${days.join(',')}`);
+    if (byDay.length > 0) parts.push(`BYDAY=${byDay.join(',')}`);
+    if (byHour !== null && byHour !== list(Array.from({ length: 24 }, (_, hour) => hour))) parts.push(`BYHOUR=${byHour}`);
+    if (byMinute !== null) parts.push(`BYMINUTE=${byMinute}`);
+    return parts.join(';');
+  }
 }
 
 /**
@@ -752,3 +918,16 @@ class Parser {
  */
 export const parse = (input: string, options: ParseOptions = {}): Schedule =>
   new Parser(input, tokenize(input), options).run();
+
+/**
+ * Converts a Russian or English schedule description into an iCalendar RRULE (RFC 5545), without the `RRULE:` prefix.
+ * Unlike cron it supports every N weeks, the last day of the month and the Nth weekday.
+ *
+ * @example
+ * ```ts
+ * toRRule('каждые 2 недели по понедельникам в 10'); // 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;BYHOUR=10;BYMINUTE=0'
+ * ```
+ * @throws {CronsenseError} when the text cannot be expressed exactly.
+ */
+export const toRRule = (input: string, options: ParseOptions = {}): string =>
+  new Parser(input, tokenize(input), options, 'rrule').runRRule();
