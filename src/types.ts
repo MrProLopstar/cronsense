@@ -35,6 +35,8 @@ export interface Schedule {
 export interface ParseOptions {
   /** Weekday used for "weekly" / «еженедельно» when no day is given. Defaults to 0 (Sunday), as `@weekly`. */
   readonly weeklyOn?: Weekday;
+  /** Reject hours 1–12 without «утра»/«вечера» or am/pm instead of reading them as morning. */
+  readonly strictHours?: boolean;
 }
 
 /** Time zone used to compute run times. */

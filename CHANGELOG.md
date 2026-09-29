@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.2.0
+
+- `strictHours` option: hours 1–12 without «утра»/«вечера» or am/pm fail with `AMBIGUOUS` instead of being read as morning; `--strict-hours` in the CLI, `strictHours` in the MCP `to_cron` tool
+- «без четверти пополудни» is 11:45
+
 ## 1.1.0
 
 - Spoken Russian time: «полвторого», «в половину третьего», «в четверть третьего», «без четверти три», «без пяти шестнадцать», «в пять минут седьмого», «в час дня», «в час ночи», «пополудни»

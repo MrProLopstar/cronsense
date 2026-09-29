@@ -23,6 +23,7 @@ Options:
   -e, --explain        Print a natural-language description
       --locale <ru|en> Language of the description (default en)
       --weekly-on <d>  Weekday for "weekly" (0-6, Sunday = 0; default 0)
+      --strict-hours   Reject 1-12 o'clock without morning/evening or am/pm
       --json           Print machine-readable JSON
   -h, --help           Show this help
   -v, --version        Show version`;
@@ -58,6 +59,7 @@ const main = (argv: readonly string[]): number => {
       explain: { type: 'boolean', short: 'e', default: false },
       locale: { type: 'string' },
       'weekly-on': { type: 'string' },
+      'strict-hours': { type: 'boolean', default: false },
       json: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', short: 'v', default: false },
@@ -84,7 +86,7 @@ const main = (argv: readonly string[]): number => {
   const locale = values.locale ?? 'en';
   if (locale !== 'ru' && locale !== 'en') throw new RangeError('--locale must be "ru" or "en"');
   const timezone: Timezone = values.utc ? 'utc' : 'local';
-  const schedule: Schedule = values.cron ? parseCron(input) : parse(input, weeklyOn === undefined ? {} : { weeklyOn });
+  const schedule: Schedule = values.cron ? parseCron(input) : parse(input, { strictHours: values['strict-hours'], ...(weeklyOn === undefined ? {} : { weeklyOn }) });
   const runs = count === undefined ? [] : nextRuns(schedule, { count, timezone });
   const description = values.explain ? describe(schedule, { locale }) : null;
 

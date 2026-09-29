@@ -37,6 +37,7 @@ const TOOLS: Json = [
       properties: {
         text: { type: 'string', description: 'Schedule description in Russian or English' },
         weeklyOn: { type: 'integer', minimum: 0, maximum: 6, description: 'Weekday for "weekly" (0 = Sunday, default)' },
+        strictHours: { type: 'boolean', description: 'Reject hours 1-12 without morning/evening or am/pm instead of assuming morning' },
         locale: { type: 'string', enum: ['ru', 'en'], description: 'Language of the returned description (default en)' },
       },
       required: ['text'],
@@ -131,7 +132,9 @@ const callTool = (name: string, args: Args): ToolResult => {
       const text = requiredString(args, 'text');
       const weeklyOn = optionalInteger(args, 'weeklyOn', 0, 6) as Weekday | undefined;
       const locale = optionalEnum(args, 'locale', ['ru', 'en'] as const) ?? 'en';
-      const schedule = parse(text, weeklyOn === undefined ? {} : { weeklyOn });
+      const strict = args['strictHours'];
+      if (strict !== undefined && typeof strict !== 'boolean') throw new ParamsError('"strictHours" must be a boolean');
+      const schedule = parse(text, { strictHours: strict === true, ...(weeklyOn === undefined ? {} : { weeklyOn }) });
       const result = summary(schedule, locale);
       return success(`${schedule.cron}\n${String(result['description'])}`, result);
     }

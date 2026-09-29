@@ -54,6 +54,12 @@ describe('mcp server', () => {
     });
   });
 
+  it('supports strictHours', () => {
+    expect(call('to_cron', { text: 'без шести семь', strictHours: true })).toMatchObject({ structuredContent: { code: 'AMBIGUOUS' }, isError: true });
+    expect(call('to_cron', { text: 'без шести семь вечера', strictHours: true })).toMatchObject({ structuredContent: { cron: '54 18 * * *' }, isError: false });
+    expect(request(1, 'tools/call', { name: 'to_cron', arguments: { text: 'в 7', strictHours: 'yes' } })).toMatchObject({ error: { code: -32602 } });
+  });
+
   it('reports schedule errors as tool errors', () => {
     expect(call('to_cron', { text: 'по будням кроме пятницы' })).toMatchObject({
       structuredContent: { code: 'UNSUPPORTED', span: { start: 10, end: 15 } },

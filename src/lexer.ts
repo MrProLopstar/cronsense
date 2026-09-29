@@ -6,7 +6,7 @@ type Spanned<T> = T & { readonly span: Span };
 
 export type Token =
   | Spanned<{ readonly t: 'num'; readonly value: number; readonly ordinal: boolean }>
-  | Spanned<{ readonly t: 'time'; readonly hour: number; readonly minute: number }>
+  | Spanned<{ readonly t: 'time'; readonly hour: number; readonly minute: number; readonly padded: boolean }>
   | Spanned<{ readonly t: 'dash' }>
   | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'cardinal' | 'halfOf' | 'halfHour' | 'unsupported' }>>;
 
@@ -50,7 +50,7 @@ export const tokenize = (input: string): Token[] => {
     const time = matchAt(TIME, text, index);
     if (time !== null) {
       const span = { start: index, end: index + time[0].length };
-      tokens.push({ t: 'time', hour: Number(time[1]), minute: Number(time[2]), span });
+      tokens.push({ t: 'time', hour: Number(time[1]), minute: Number(time[2]), padded: time[1]?.startsWith('0') === true, span });
       index = span.end;
       continue;
     }

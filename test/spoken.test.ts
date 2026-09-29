@@ -34,6 +34,8 @@ const phrases: ReadonlyArray<readonly [string, string]> = [
   ['без двадцати пяти', '40 4 * * *'],
   ['без четверти полночь', '45 23 * * *'],
   ['без пяти полдень', '55 11 * * *'],
+  ['без четверти пополудни', '45 11 * * *'],
+  ['Без четверти пополудни', '45 11 * * *'],
   ['в три утра', '0 3 * * *'],
   ['в три часа утра', '0 3 * * *'],
   ['в три пополудни', '0 15 * * *'],
@@ -149,5 +151,39 @@ describe('spoken errors', () => {
     const result = safeParse(text);
     expect(result.ok, text).toBe(false);
     if (!result.ok) expect(result.error.code).toBe(code);
+  });
+});
+
+describe('strictHours', () => {
+  const ambiguous = [
+    'без шести семь', 'в 7', 'в семь', 'в 9:30', 'в полвторого', 'в полпервого', 'в час', 'в пять минут седьмого',
+    'в 9 часов 45 минут', 'по будням в 9:30', 'at 7', 'в 9 и 21', 'в четверть третьего', 'без четверти двенадцать',
+  ];
+  it.each(ambiguous)('rejects %j', (text) => {
+    const result = safeParse(text, { strictHours: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('AMBIGUOUS');
+    expect(safeParse(text).ok).toBe(true);
+  });
+
+  const certain: ReadonlyArray<readonly [string, string]> = [
+    ['без шести семь вечера', '54 18 * * *'],
+    ['в 19:00', '0 19 * * *'],
+    ['в 09:30', '30 9 * * *'],
+    ['в 0:15', '15 0 * * *'],
+    ['в три утра', '0 3 * * *'],
+    ['в полдень', '0 12 * * *'],
+    ['в полночь', '0 0 * * *'],
+    ['без пяти шестнадцать', '55 15 * * *'],
+    ['at 7pm', '0 19 * * *'],
+    ['в полвторого дня', '30 13 * * *'],
+    ['без четверти пополудни', '45 11 * * *'],
+    ['каждые 15 минут с 9 до 18', '*/15 9-17 * * *'],
+    ['каждый час в 15 минут', '15 * * * *'],
+    ['ежедневно', '0 0 * * *'],
+    ['по будням в 21:30', '30 21 * * 1-5'],
+  ];
+  it.each(certain)('accepts %j', (text, cron) => {
+    expect(toCron(text, { strictHours: true })).toBe(cron);
   });
 });

@@ -154,6 +154,8 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 | `describe(schedule \| expression, options?)` | Natural-language description; `locale`: `'en'` (default) or `'ru'` |
 | `formatCron(fields)` | Formats structured fields back into a cron string |
 
+`ParseOptions.strictHours` rejects hours 1–12 without «утра»/«вечера» or am/pm with `AMBIGUOUS` instead of reading them as morning: «без шести семь» fails, «без шести семь вечера», «в 19:00» and «в 09:30» pass. Use it where a wrong guess is costly, for example in reminder bots. CLI: `--strict-hours`; MCP: `strictHours`.
+
 `ParseOptions.weeklyOn` sets the weekday used by "weekly" / «еженедельно» (default `0`, Sunday, as in `@weekly`).
 
 ### Error codes
@@ -195,6 +197,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 
 ## Semantics worth knowing
 
+- Without «утра»/«вечера» or am/pm, hours 1–12 are read as said, so «без шести семь» is 6:54 just like «в 7» is 7:00; pass `strictHours: true` to reject them instead.
 - Spoken hours follow the words: «полвторого» is 1:30 and «полвторого дня» is 13:30; «первого» means the twelfth hour, so «полпервого» is 12:30 and «полпервого ночи» is 0:30.
 - «с 9 до 18» with a minute interval ends before 18:00 (`9-17`); with an hour interval, 18:00 is included (`9-18`).
 - Cron ORs day-of-month and day-of-week, so «по понедельникам 1 числа» is rejected instead of silently meaning "every Monday **or** the 1st".

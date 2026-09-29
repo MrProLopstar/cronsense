@@ -13,6 +13,7 @@ interface Clock {
   readonly hour: number;
   readonly minute: number;
   readonly span: Span;
+  readonly ambiguous?: true;
 }
 
 interface TimeWindow {
@@ -273,11 +274,11 @@ class Parser {
     return null;
   }
 
-  private makeClock(hour: number, minute: number, span: Span, meridiem: Meridiem | null): Clock {
+  private makeClock(hour: number, minute: number, span: Span, meridiem: Meridiem | null, padded = false): Clock {
     if (minute < 0 || minute > 59) this.fail('OUT_OF_RANGE', `Minute ${minute} is out of range 0-59`, span);
     if (meridiem === null) {
       if (hour > 23) this.fail('OUT_OF_RANGE', `Hour ${hour} is out of range 0-23`, span);
-      return { hour, minute, span };
+      return hour >= 1 && hour <= 12 && !padded ? { hour, minute, span, ambiguous: true } : { hour, minute, span };
     }
     if (hour < 1 || hour > 12) this.fail('OUT_OF_RANGE', `Hour ${hour} cannot be used with am/pm`, span);
     const base = hour % 12;
@@ -328,6 +329,7 @@ class Parser {
     if (target.t === 'num' && !target.ordinal) hour = target.value;
     else if (target.t === 'unit' && target.unit === 'hour' && target.meridiem === undefined) hour = 1;
     else if (target.t === 'clock') hour = target.hour === 0 ? 24 : 12;
+    else if (target.t === 'meridiem' && this.text(target.span).toLowerCase() === 'пополудни') return { k: 'clock', clock: { hour: 11, minute: 60 - minutes, span: join(start, target.span) } };
     else this.unexpected(target);
     const hourUnit = this.peek();
     if (hourUnit?.t === 'unit' && hourUnit.unit === 'hour' && hourUnit.meridiem === undefined && target.t === 'num') this.index += 1;
@@ -358,7 +360,7 @@ class Parser {
       case 'time': {
         const suffix = this.meridiemSuffix();
         const span = suffix === null ? token.span : join(token.span, suffix.span);
-        return { k: 'clock', clock: this.makeClock(token.hour, token.minute, span, suffix?.meridiem ?? null) };
+        return { k: 'clock', clock: this.makeClock(token.hour, token.minute, span, suffix?.meridiem ?? null, token.padded) };
       }
       case 'num': {
         if (token.ordinal) return { k: 'num', value: token.value, ordinal: true, span: token.span };
@@ -488,7 +490,11 @@ class Parser {
       if (entry.k === 'range') {
         this.fail('UNSUPPORTED', `A time range cannot be mixed with separate times`, entry.span);
       }
-      this.times.push(this.toClock(entry.item));
+      const clock = this.toClock(entry.item);
+      if (clock.ambiguous === true && this.options.strictHours === true) {
+        this.fail('AMBIGUOUS', `"${this.text(clock.span)}" could be morning or evening; add «утра»/«вечера», am/pm, or use 24-hour time`, clock.span);
+      }
+      this.times.push(clock);
     }
   }
 

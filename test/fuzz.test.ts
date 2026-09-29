@@ -43,6 +43,8 @@ suite('fuzz', () => {
       } catch (error: unknown) {
         throw new Error(`crash on "${phrase}": ${String(error)}`);
       }
+      const strict = safeParse(phrase, { strictHours: true });
+      if (strict.ok) expect(result.ok && result.schedule.cron, phrase).toBe(strict.schedule.cron);
       if (!result.ok) {
         expect(result.error, phrase).toBeInstanceOf(CronsenseError);
         const { span } = result.error;
