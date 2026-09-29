@@ -44,7 +44,7 @@ const MAX_STEP: { readonly [K in Unit]: number } = {
   year: 1,
 };
 
-const VALUE_TOKENS: ReadonlySet<Token['t']> = new Set(['num', 'time', 'clock']);
+const VALUE_TOKENS: ReadonlySet<Token['t']> = new Set(['num', 'time', 'clock', 'half', 'quarter', 'without']);
 
 const join = (a: Span, b: Span): Span => ({ start: Math.min(a.start, b.start), end: Math.max(a.end, b.end) });
 
@@ -180,10 +180,19 @@ class Parser {
       case 'num':
       case 'time':
       case 'clock':
+      case 'half':
+      case 'quarter':
+      case 'without':
         this.index -= 1;
         this.valueList(at);
         return;
       case 'unit':
+        if (at && token.unit === 'hour' && token.meridiem === undefined) {
+          this.index -= 1;
+          this.valueList(at);
+          return;
+        }
+        this.unexpected(token);
       case 'meridiem':
       case 'domMarker':
       case 'dash':
@@ -203,6 +212,13 @@ class Parser {
         this.advance();
         this.addInterval(token.unit, step, join(start, token.span));
         return;
+      case 'half': {
+        const hour = this.peek(1);
+        if (step !== 1 || hour?.t !== 'unit' || hour.unit !== 'hour') this.unexpected(token);
+        this.index += 2;
+        this.addInterval('minute', 30, join(start, hour.span));
+        return;
+      }
       case 'num': {
         const unit = this.peek(1);
         if (unit?.t === 'unit') {
@@ -275,9 +291,68 @@ class Parser {
     }
   }
 
+  private hourOf(token: Token | undefined, what: string): { readonly hour: number; readonly span: Span } {
+    if (token?.t !== 'num' || !token.ordinal) {
+      const span = token?.span ?? { start: this.input.length, end: this.input.length };
+      this.fail('INCOMPLETE', `Expected an hour after "${what}", e.g. «третьего»`, span);
+    }
+    this.index += 1;
+    if (token.value < 1 || token.value > 12) this.fail('OUT_OF_RANGE', `Hour «${this.text(token.span)}» must be between first and twelfth`, token.span);
+    return { hour: token.value === 1 ? 12 : token.value - 1, span: token.span };
+  }
+
+  private spokenClock(hour: number, minute: number, start: Span, end: Span): Item {
+    const suffix = this.meridiemSuffix();
+    const span = join(start, suffix?.span ?? end);
+    return { k: 'clock', clock: this.makeClock(hour, minute, span, suffix?.meridiem ?? null) };
+  }
+
+  private beforeHour(start: Span): Item {
+    let minutes: number;
+    const amount = this.advance();
+    if (amount.t === 'quarter') minutes = 15;
+    else if (amount.t === 'num' && !amount.ordinal) minutes = amount.value;
+    else this.unexpected(amount);
+    const unit = this.peek();
+    if (unit?.t === 'unit' && unit.unit === 'minute') this.index += 1;
+    const next = this.peek();
+    const hourFollows = next?.t === 'num' || next?.t === 'clock' || (next?.t === 'unit' && next.unit === 'hour' && next.meridiem === undefined);
+    const compound = amount.t === 'num' && minutes > 20 && minutes % 10 !== 0 && /\s/.test(this.text(amount.span));
+    if (!hourFollows && compound) {
+      const hour = minutes % 10;
+      return this.spokenClock(hour === 1 ? 12 : hour - 1, 60 - (minutes - hour), start, amount.span);
+    }
+    if (minutes < 1 || minutes > 59) this.fail('OUT_OF_RANGE', `"${this.text(amount.span)}" must be between 1 and 59 minutes`, amount.span);
+    const target = this.advance();
+    let hour: number;
+    if (target.t === 'num' && !target.ordinal) hour = target.value;
+    else if (target.t === 'unit' && target.unit === 'hour' && target.meridiem === undefined) hour = 1;
+    else if (target.t === 'clock') hour = target.hour === 0 ? 24 : 12;
+    else this.unexpected(target);
+    const hourUnit = this.peek();
+    if (hourUnit?.t === 'unit' && hourUnit.unit === 'hour' && hourUnit.meridiem === undefined && target.t === 'num') this.index += 1;
+    if (hour < 1 || hour > 24) this.fail('OUT_OF_RANGE', `Hour ${hour} is out of range 1-24`, target.span);
+    return this.spokenClock(hour === 1 ? 12 : hour - 1, 60 - minutes, start, target.span);
+  }
+
   private item(): Item {
     const token = this.advance();
     switch (token.t) {
+      case 'unit': {
+        if (token.unit !== 'hour' || token.meridiem !== undefined) this.unexpected(token);
+        return this.spokenClock(1, 0, token.span, token.span);
+      }
+      case 'half': {
+        this.take('dash');
+        const { hour, span } = this.hourOf(this.peek(), this.text(token.span));
+        return this.spokenClock(hour, 30, token.span, span);
+      }
+      case 'quarter': {
+        const { hour, span } = this.hourOf(this.peek(), this.text(token.span));
+        return this.spokenClock(hour, 15, token.span, span);
+      }
+      case 'without':
+        return this.beforeHour(token.span);
       case 'clock':
         return { k: 'clock', clock: { hour: token.hour, minute: 0, span: token.span } };
       case 'time': {
@@ -295,6 +370,11 @@ class Parser {
           this.index += 1;
           span = join(span, minuteUnit.span);
           if (token.value > 59) this.fail('OUT_OF_RANGE', `Minute ${token.value} is out of range 0-59`, span);
+          const hourWord = this.peek();
+          if (hourWord?.t === 'num' && hourWord.ordinal && this.kindAt(1) !== 'domMarker') {
+            const { hour, span: end } = this.hourOf(hourWord, this.text(span));
+            return this.spokenClock(hour, token.value, token.span, end);
+          }
           return { k: 'mark', minute: token.value, span };
         }
         const hourUnit = this.peek();
@@ -611,9 +691,9 @@ class Parser {
     const yearly = this.intervals.get('year');
     const { weekdays, monthDays, months } = this;
 
-    let dayOfMonth: CronField = monthDays === null ? ANY : valuesField(monthDays.values);
-    let dayOfWeek: CronField = weekdays === null ? ANY : valuesField(weekdays.values);
-    let month: CronField = months === null ? ANY : valuesField(months.values);
+    let dayOfMonth: CronField = monthDays === null || monthDays.values.size === 31 ? ANY : valuesField(monthDays.values);
+    let dayOfWeek: CronField = weekdays === null || weekdays.values.size === 7 ? ANY : valuesField(weekdays.values);
+    let month: CronField = months === null || months.values.size === 12 ? ANY : valuesField(months.values);
 
     if (weekdays !== null && monthDays !== null) {
       this.fail('CONFLICT', `Cron treats day-of-month and weekday as "either", so they cannot be combined`, join(weekdays.span, monthDays.span));

@@ -167,7 +167,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 | `AMBIGUOUS` | A bare number could be a time or a day: add «в»/"at" or «числа»/"th" |
 | `CONFLICT` | Parts contradict each other or cron would treat them with OR semantics |
 | `INCOMPLETE` | «с 9 до 18» without an interval, "every" without a unit |
-| `UNSUPPORTED` | Last day of month, seconds, exclusions, every 2 weeks, … |
+| `UNSUPPORTED` | Last day of month, seconds, exclusions, every 2 weeks, decades and centuries |
 | `INVALID_CRON` | `parseCron` received a malformed expression |
 
 ## What it understands
@@ -175,6 +175,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 - Intervals: every N minutes / hours / days / months, «через день», "every other hour", «раз в 5 минут», "once a day"
 - Frequencies: hourly, daily, weekly, monthly, yearly / «ежечасно», «ежедневно», …
 - Minutes of the hour: «каждый час в 15 минут», "every hour at 15 minutes past"
+- Spoken Russian time: «полвторого», «в половину третьего», «в четверть девятого вечера», «без пяти шестнадцать», «в пять минут седьмого», «в час дня», number words («в три утра», «каждые двадцать пять минут», «каждые полчаса»)
 - Times: `9:30`, `9.30`, `9am`, `7 p.m.`, noon / midnight, «в 3 часа дня», «в 11 ночи», «9 часов 45 минут», several times at once
 - Time ranges for intervals: «с 9 до 18», "between 9 and 17", «до 12», overnight windows like «с 22 до 6»
 - Weekdays: names, abbreviations, ranges (`пн-пт`, "monday through friday"), weekdays / weekends
@@ -194,6 +195,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 
 ## Semantics worth knowing
 
+- Spoken hours follow the words: «полвторого» is 1:30 and «полвторого дня» is 13:30; «первого» means the twelfth hour, so «полпервого» is 12:30 and «полпервого ночи» is 0:30.
 - «с 9 до 18» with a minute interval ends before 18:00 (`9-17`); with an hour interval, 18:00 is included (`9-18`).
 - Cron ORs day-of-month and day-of-week, so «по понедельникам 1 числа» is rejected instead of silently meaning "every Monday **or** the 1st".
 - Several times must form a grid (the same minutes for every hour): `9:00, 9:30, 18:00, 18:30` works, while `9:00 and 18:30` needs two schedules.

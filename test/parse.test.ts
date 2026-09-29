@@ -163,7 +163,6 @@ const failures: ReadonlyArray<readonly [string, ErrorCode]> = [
   ['в последний день месяца', 'UNSUPPORTED'],
   ['every 10 seconds', 'UNSUPPORTED'],
   ['every day except sunday', 'UNSUPPORTED'],
-  ['каждые полчаса', 'UNSUPPORTED'],
   ['every 2 weeks', 'UNSUPPORTED'],
   ['every other monday', 'UNSUPPORTED'],
   ['в 9:00 и 18:30', 'UNSUPPORTED'],

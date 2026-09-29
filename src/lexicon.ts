@@ -4,6 +4,12 @@ export type Lexeme =
   | { readonly t: 'every' }
   | { readonly t: 'other' }
   | { readonly t: 'ordinal'; readonly value: number }
+  | { readonly t: 'cardinal'; readonly value: number }
+  | { readonly t: 'halfOf'; readonly value: number }
+  | { readonly t: 'halfHour' }
+  | { readonly t: 'half' }
+  | { readonly t: 'quarter' }
+  | { readonly t: 'without' }
   | { readonly t: 'unit'; readonly unit: Unit; readonly meridiem?: Meridiem }
   | { readonly t: 'freq'; readonly unit: Unit }
   | { readonly t: 'dow'; readonly days: readonly Weekday[] }
@@ -23,6 +29,24 @@ type Rule = readonly [pattern: RegExp, lexeme: Lexeme];
 const WEEKDAYS: readonly Weekday[] = [1, 2, 3, 4, 5];
 const WEEKEND: readonly Weekday[] = [6, 0];
 
+const ORDINAL_ENDING = '(?:ый|ий|ой|ое|ье|ого|ьего|ая|ья|ую|ью|ым|ьим|ом|ьем)';
+
+const ORDINALS: readonly (readonly [string, number])[] = [
+  ['четверт', 4], ['пят', 5], ['шест', 6], ['седьм', 7], ['восьм', 8],
+  ['девят', 9], ['десят', 10], ['одиннадцат', 11], ['двенадцат', 12],
+];
+
+const HOUR_ORDINALS: readonly (readonly [string, number])[] = [['перв', 1], ['втор', 2], ['трет', 3], ...ORDINALS];
+
+const CARDINALS: readonly (readonly [string, number])[] = [
+  ['один|одна|одну|одного|одной', 1], ['два|две|двух', 2], ['три|трех', 3], ['четыре|четырех', 4],
+  ['пять|пяти', 5], ['шесть|шести', 6], ['семь|семи', 7], ['восемь|восьми', 8], ['девять|девяти', 9],
+  ['десять|десяти', 10], ['одиннадцат[ьи]', 11], ['двенадцат[ьи]', 12], ['тринадцат[ьи]', 13],
+  ['четырнадцат[ьи]', 14], ['пятнадцат[ьи]', 15], ['шестнадцат[ьи]', 16], ['семнадцат[ьи]', 17],
+  ['восемнадцат[ьи]', 18], ['девятнадцат[ьи]', 19], ['двадцат[ьи]', 20], ['тридцат[ьи]', 30],
+  ['сорока?', 40], ['пятьдесят|пятидесяти', 50],
+];
+
 const dow = (day: Weekday): Lexeme => ({ t: 'dow', days: [day] });
 const month = (value: number): Lexeme => ({ t: 'month', month: value });
 const unit = (value: Unit): Lexeme => ({ t: 'unit', unit: value });
@@ -35,6 +59,13 @@ const RULES: readonly Rule[] = [
   [/^(?:перв(?:ый|ое|ого|ая|ую|ой|ым|ом)|first)$/, { t: 'ordinal', value: 1 }],
   [/^(?:втор(?:ой|ое|ого|ая|ую|ым|ом)|second)$/, { t: 'ordinal', value: 2 }],
   [/^(?:трет(?:ий|ье|ьего|ья|ью|ьим|ьем)|third)$/, { t: 'ordinal', value: 3 }],
+
+  ...ORDINALS.map(([stem, value]): Rule => [new RegExp(`^${stem}${ORDINAL_ENDING}$`), { t: 'ordinal', value }]),
+  ...CARDINALS.map(([pattern, value]): Rule => [new RegExp(`^(?:${pattern})$`), { t: 'cardinal', value }]),
+  [/^полчаса$/, { t: 'halfHour' }],
+  [/^(?:половин[аеуы]|пол)$/, { t: 'half' }],
+  [/^четверт[ьи]$/, { t: 'quarter' }],
+  [/^без$/, { t: 'without' }],
 
   [/^дня$/, { t: 'unit', unit: 'day', meridiem: 'pm' }],
   [/^(?:минут[аыу]?|мин|minutes?|mins?)$/, unit('minute')],
@@ -74,8 +105,8 @@ const RULES: readonly Rule[] = [
   [/^(?:ноябр[а-яь]*|november|nov)$/, month(11)],
   [/^(?:декабр[а-яь]*|december|dec)$/, month(12)],
 
-  [/^(?:утра|am|morning)$/, { t: 'meridiem', meridiem: 'am' }],
-  [/^(?:вечера|pm|evening|afternoon)$/, { t: 'meridiem', meridiem: 'pm' }],
+  [/^(?:утра|пополуночи|am|morning)$/, { t: 'meridiem', meridiem: 'am' }],
+  [/^(?:вечера|пополудни|pm|evening|afternoon)$/, { t: 'meridiem', meridiem: 'pm' }],
   [/^(?:ночи|night)$/, { t: 'meridiem', meridiem: 'night' }],
   [/^(?:полдень|полудня|noon|midday)$/, { t: 'clock', hour: 12 }],
   [/^(?:полночь|полуночи|midnight)$/, { t: 'clock', hour: 0 }],
@@ -92,10 +123,18 @@ const RULES: readonly Rule[] = [
   [/^(?:последн[а-я]*|last)$/, { t: 'unsupported', feature: 'last day / last weekday of month' }],
   [/^(?:секунд[а-я]*|seconds?|secs?)$/, { t: 'unsupported', feature: 'second-level precision' }],
   [/^(?:кроме|except|excluding)$/, { t: 'unsupported', feature: 'exclusions' }],
-  [/^(?:полчаса|half)$/, { t: 'unsupported', feature: 'fractional intervals, use "30 minutes"' }],
+  [/^(?:десятилет[а-я]*|век[аеу]?|веков|столет[а-я]*|decades?|centur(?:y|ies))$/, { t: 'unsupported', feature: 'intervals longer than a year' }],
 ];
 
+const HALF_OF = new RegExp(`^пол-?(${HOUR_ORDINALS.map(([stem]) => stem).join('|')})(?:ого|ьего)$`);
+
 export const lookupWord = (word: string): Lexeme | null => {
+  const half = HALF_OF.exec(word);
+  const stem = half?.[1];
+  if (stem !== undefined) {
+    const value = HOUR_ORDINALS.find(([candidate]) => candidate === stem)?.[1];
+    if (value !== undefined) return { t: 'halfOf', value };
+  }
   for (const [pattern, lexeme] of RULES) {
     if (pattern.test(word)) return lexeme;
   }

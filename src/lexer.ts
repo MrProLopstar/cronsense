@@ -8,7 +8,7 @@ export type Token =
   | Spanned<{ readonly t: 'num'; readonly value: number; readonly ordinal: boolean }>
   | Spanned<{ readonly t: 'time'; readonly hour: number; readonly minute: number }>
   | Spanned<{ readonly t: 'dash' }>
-  | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'unsupported' }>>;
+  | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'cardinal' | 'halfOf' | 'halfHour' | 'unsupported' }>>;
 
 export type TokenOf<K extends Token['t']> = Extract<Token, { readonly t: K }>;
 
@@ -38,6 +38,7 @@ export const tokenize = (input: string): Token[] => {
   const text = normalize(input);
   const tokens: Token[] = [];
   let index = 0;
+  let wordTens: Token | null = null;
 
   while (index < text.length) {
     const space = matchAt(SPACE, text, index) ?? matchAt(IGNORED, text, index);
@@ -78,9 +79,25 @@ export const tokenize = (input: string): Token[] => {
         case 'ordinal':
           tokens.push({ t: 'num', value: lexeme.value, ordinal: true, span });
           break;
+        case 'cardinal': {
+          const previous = tokens.at(-1);
+          const tens = previous?.t === 'num' && !previous.ordinal && wordTens === previous && lexeme.value < 10;
+          if (tens) tokens[tokens.length - 1] = { ...previous, value: previous.value + lexeme.value, span: { start: previous.span.start, end: span.end } };
+          else tokens.push({ t: 'num', value: lexeme.value, ordinal: false, span });
+          break;
+        }
+        case 'halfOf':
+          tokens.push({ t: 'half', span: { start: span.start, end: span.start + 3 } });
+          tokens.push({ t: 'num', value: lexeme.value, ordinal: true, span: { start: span.start + 3, end: span.end } });
+          break;
+        case 'halfHour':
+          tokens.push({ t: 'num', value: 30, ordinal: false, span }, { t: 'unit', unit: 'minute', span });
+          break;
         default:
           tokens.push({ ...lexeme, span });
       }
+      const last = tokens.at(-1);
+      wordTens = lexeme.t === 'cardinal' && last?.t === 'num' && last.value % 10 === 0 && last.value >= 20 ? last : null;
       index = span.end;
       continue;
     }

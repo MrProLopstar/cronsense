@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.1.0
+
+- Spoken Russian time: «полвторого», «в половину третьего», «в четверть третьего», «без четверти три», «без пяти шестнадцать», «в пять минут седьмого», «в час дня», «в час ночи», «пополудни»
+- Number words from 1 to 59: «в три утра», «каждые двадцать пять минут», «без двадцати один»
+- «каждые полчаса», «раз в полчаса»
+- Ordinal days in words: «пятого числа», «с пятого по десятое число»
+- Clear `UNSUPPORTED` error for decades and centuries
+- Full weekday, month or day sets now produce `*`
+- Fuzz test over 20 000 random phrases
+
 ## 1.0.1
 
 - Also published to GitHub Packages as `@mrprolopstar/cronsense`
