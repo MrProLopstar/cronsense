@@ -1,12 +1,18 @@
 import { formatField, FIELD_ORDER } from '../src/field.js';
-import { CronsenseError, describe, nextRuns, parse, parseCron, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
+import { isWorkday, lastYear, ProdcalError } from '@mrprolopstar/prodcal';
+import { CronsenseError, describe, nextRuns, occurrences, parse, parseCron, toRRule, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
 
-type Mode = 'text' | 'cron';
+type Mode = 'text' | 'cron' | 'dates';
 
 interface Strings {
   readonly tagline: string;
   readonly modeText: string;
   readonly modeCron: string;
+  readonly modeDates: string;
+  readonly noRRule: string;
+  readonly calendarLimit: string;
+  readonly weekdaysOnly: string;
+  readonly dateExamples: readonly string[];
   readonly inputLabel: { readonly [M in Mode]: string };
   readonly copy: string;
   readonly copied: string;
@@ -25,7 +31,12 @@ const STRINGS: { readonly [L in Locale]: Strings } = {
     tagline: 'Расписания на русском и английском → cron и обратно. Без LLM, детерминированно.',
     modeText: 'Текст → cron',
     modeCron: 'cron → текст',
-    inputLabel: { text: 'Опишите расписание словами', cron: 'Введите cron-выражение' },
+    modeDates: 'Даты и RRULE',
+    noRRule: 'В RRULE не выражается',
+    calendarLimit: 'Производственный календарь известен до конца {year} года',
+    weekdaysOnly: 'RRULE не знает праздников: в нём только пн–пт, а даты ниже учитывают производственный календарь',
+    dateExamples: ['в последний рабочий день месяца в 18:00', 'в первый рабочий день месяца в 9:00', 'через 49 дней после Пасхи', 'в Пасху в 10 утра', 'в первый понедельник месяца в 9:30', 'каждые 2 недели по понедельникам в 19:00', 'за 46 дней до католической Пасхи', 'по рабочим дням в 9:30'],
+    inputLabel: { text: 'Опишите расписание словами', cron: 'Введите cron-выражение', dates: 'Опишите расписание: рабочие дни, Пасха, N-й день недели' },
     copy: 'Копировать',
     copied: 'Скопировано',
     nextRuns: 'Ближайшие запуски',
@@ -50,7 +61,12 @@ const STRINGS: { readonly [L in Locale]: Strings } = {
     tagline: 'Plain Russian or English schedules → cron and back. No LLM, fully deterministic.',
     modeText: 'Text → cron',
     modeCron: 'cron → text',
-    inputLabel: { text: 'Describe a schedule in words', cron: 'Enter a cron expression' },
+    modeDates: 'Dates and RRULE',
+    noRRule: 'Not expressible in RRULE',
+    calendarLimit: 'The production calendar is known until the end of {year}',
+    weekdaysOnly: 'RRULE cannot know holidays: it has Monday to Friday, while the dates below follow the production calendar',
+    dateExamples: ['last working day of the month at 6pm', 'first monday of the month at 9am', '49 days after easter', 'orthodox easter at 10am', 'every other monday at 7pm', 'last weekday of the month at 5pm'],
+    inputLabel: { text: 'Describe a schedule in words', cron: 'Enter a cron expression', dates: 'Describe a schedule: working days, Easter, Nth weekdays' },
     copy: 'Copy',
     copied: 'Copied',
     nextRuns: 'Next runs',
@@ -91,17 +107,18 @@ const error = element('error', HTMLDivElement);
 const errorTitle = element('error-title', HTMLElement);
 const errorExcerpt = element('error-excerpt', HTMLPreElement);
 
-const isMode = (value: string | null | undefined): value is Mode => value === 'text' || value === 'cron';
+const isMode = (value: string | null | undefined): value is Mode => value === 'text' || value === 'cron' || value === 'dates';
 const isLocale = (value: string | null | undefined): value is Locale => value === 'ru' || value === 'en';
 
 const hash = new URLSearchParams(location.hash.slice(1));
 const initialLang = hash.get('lang');
 const initialMode = hash.get('mode');
 
-const state: { mode: Mode; lang: Locale; schedule: Schedule | null } = {
+const state: { mode: Mode; lang: Locale; schedule: Schedule | null; copyValue: string | null } = {
   mode: isMode(initialMode) ? initialMode : 'text',
   lang: isLocale(initialLang) ? initialLang : navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en',
   schedule: null,
+  copyValue: null,
 };
 
 const strings = (): Strings => STRINGS[state.lang];
@@ -116,7 +133,7 @@ const renderChrome = (): void => {
   document.documentElement.lang = state.lang;
   for (const node of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
     const key = node.dataset['i18n'];
-    if (key === 'tagline' || key === 'modeText' || key === 'modeCron' || key === 'copy' || key === 'nextRuns' || key === 'install') {
+    if (key === 'tagline' || key === 'modeText' || key === 'modeCron' || key === 'modeDates' || key === 'copy' || key === 'nextRuns' || key === 'install') {
       node.textContent = text[key];
     } else if (key === 'inputLabel') {
       node.textContent = text.inputLabel[state.mode];
@@ -131,7 +148,7 @@ const renderChrome = (): void => {
   }
   input.classList.toggle('mono', state.mode === 'cron');
   examples.replaceChildren(
-    ...(state.mode === 'text' ? text.examples : CRON_EXAMPLES).map((example) => {
+    ...(state.mode === 'text' ? text.examples : state.mode === 'dates' ? text.dateExamples : CRON_EXAMPLES).map((example) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.textContent = example;
@@ -157,6 +174,9 @@ const formatRun = (date: Date): string =>
 const showSchedule = (schedule: Schedule): void => {
   const text = strings();
   cron.textContent = schedule.cron;
+  cron.classList.remove('rule');
+  state.copyValue = schedule.cron;
+  fields.hidden = false;
   description.textContent = describe(schedule, { locale: state.lang });
   fields.replaceChildren(
     ...FIELD_ORDER.map((name) => {
@@ -174,6 +194,43 @@ const showSchedule = (schedule: Schedule): void => {
     ...nextRuns(schedule, { count: 5 }).map((run) => {
       const item = document.createElement('li');
       item.textContent = formatRun(run);
+      return item;
+    }),
+  );
+  result.hidden = false;
+  error.hidden = true;
+};
+
+const showDates = (value: string): void => {
+  const text = strings();
+  let rule: string | null = null;
+  try {
+    rule = toRRule(value);
+  } catch (failure: unknown) {
+    if (!(failure instanceof CronsenseError) || !['UNSUPPORTED', 'OUT_OF_RANGE'].includes(failure.code)) throw failure;
+  }
+  const now = new Date();
+  const anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const options = { from: now, anchor, isWorkday, limit: 10 };
+  let dates: Date[];
+  let note = '';
+  try {
+    dates = occurrences(value, { ...options, to: new Date(now.getFullYear() + 3, 0, 1) });
+  } catch (failure: unknown) {
+    if (!(failure instanceof ProdcalError)) throw failure;
+    dates = occurrences(value, { ...options, to: new Date(lastYear, 11, 31, 23, 59) });
+    note = text.calendarLimit.replace('{year}', String(lastYear));
+  }
+  if (rule !== null && /рабоч|working|workday|business/i.test(value)) note = [text.weekdaysOnly, note].filter(Boolean).join('. ');
+  cron.textContent = rule ?? text.noRRule;
+  cron.classList.add('rule');
+  state.copyValue = rule;
+  description.textContent = note;
+  fields.hidden = true;
+  runs.replaceChildren(
+    ...dates.map((date) => {
+      const item = document.createElement('li');
+      item.textContent = formatRun(date);
       return item;
     }),
   );
@@ -205,6 +262,10 @@ const update = (): void => {
     return;
   }
   try {
+    if (state.mode === 'dates') {
+      showDates(value);
+      return;
+    }
     state.schedule = state.mode === 'text' ? parse(value) : parseCron(value);
     showSchedule(state.schedule);
   } catch (failure: unknown) {
@@ -216,9 +277,10 @@ const update = (): void => {
 const switchMode = (mode: Mode): void => {
   if (mode === state.mode) return;
   const schedule = state.schedule;
+  const previous = state.mode;
   state.mode = mode;
-  if (schedule !== null) input.value = mode === 'cron' ? schedule.cron : describe(schedule, { locale: state.lang });
-  else input.value = '';
+  const keepText = (mode === 'dates' && previous === 'text') || (mode === 'text' && previous === 'dates');
+  if (!keepText) input.value = schedule === null ? '' : mode === 'cron' ? schedule.cron : describe(schedule, { locale: state.lang });
   renderChrome();
   update();
 };
@@ -246,8 +308,8 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]')
 }
 
 copy.addEventListener('click', () => {
-  const value = state.schedule?.cron;
-  if (value === undefined) return;
+  const value = state.copyValue;
+  if (value === null) return;
   void navigator.clipboard.writeText(value).then(() => {
     copy.textContent = strings().copied;
     setTimeout(() => {
@@ -258,7 +320,7 @@ copy.addEventListener('click', () => {
 
 input.addEventListener('input', update);
 
-input.value = hash.get('q') ?? (state.mode === 'text' ? strings().examples : CRON_EXAMPLES)[0] ?? '';
+input.value = hash.get('q') ?? (state.mode === 'text' ? strings().examples : state.mode === 'dates' ? strings().dateExamples : CRON_EXAMPLES)[0] ?? '';
 renderChrome();
 update();
 input.focus();

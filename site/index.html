@@ -93,6 +93,7 @@ input.mono { font-family: var(--mono); }
 .result { margin-top: 24px; }
 .cron { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .cron code { font-family: var(--mono); font-size: 30px; font-weight: 600; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.cron code.rule { font-size: 17px; letter-spacing: 0; font-weight: 500; }
 .copy { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
 .description { margin: 8px 0 0; font-size: 18px; color: var(--accent); }
 .fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 20px; }
@@ -136,6 +137,7 @@ footer a { color: inherit; }
       <div class="toggle" role="group" aria-label="Mode">
         <button type="button" data-mode="text" data-i18n="modeText"></button>
         <button type="button" data-mode="cron" data-i18n="modeCron"></button>
+        <button type="button" data-mode="dates" data-i18n="modeDates"></button>
       </div>
     </div>
     <label for="input" data-i18n="inputLabel"></label>
@@ -166,6 +168,7 @@ footer a { color: inherit; }
 
   <footer data-i18n-html="footer"></footer>
 </main>
+<script type="importmap">{ "imports": { "@mrprolopstar/prodcal": "./vendor/prodcal/index.js" } }</script>
 <script type="module" src="./site/app.js"></script>
 </body>
 </html>

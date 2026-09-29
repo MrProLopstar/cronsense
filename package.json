@@ -45,7 +45,7 @@
     "test": "npm run build && vitest run",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "prepare": "npm run build",
-    "build:site": "tsc -p site/tsconfig.json && node -e \"require('node:fs').copyFileSync('site/index.html', 'site-dist/index.html')\""
+    "build:site": "tsc -p site/tsconfig.json && node scripts/copy-site.mjs"
   },
   "devDependencies": {
     "@mrprolopstar/prodcal": "npm:@jsr/mrprolopstar__prodcal@^0.1.0",
