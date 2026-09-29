@@ -46,12 +46,20 @@ jobs:
         run: |
           npm run build
           npm pkg set name=@mrprolopstar/cronsense
-          npm publish --ignore-scripts
+          if npm view "@mrprolopstar/cronsense@${TAG#v}" version > /dev/null 2>&1; then
+            echo "Already on GitHub Packages"
+          else
+            npm publish --ignore-scripts
+          fi
           git checkout -- package.json
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release already exists"
+            exit 0
+          fi
           version="${TAG#v}"
           awk -v v="$version" '$0 == "## " v {found=1; next} found && /^## / {exit} found {print}' CHANGELOG.md > notes.md
           if [ -s notes.md ]; then
