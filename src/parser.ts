@@ -12,6 +12,9 @@ export interface Plan {
   readonly byHour: readonly number[] | null;
   readonly byMinute: readonly number[] | null;
   readonly byEaster: readonly number[];
+  readonly bySetPos: readonly number[];
+  readonly setPosGroup: 'weekday' | 'workday' | null;
+  readonly workdays: boolean;
   readonly easter: EasterCalendar;
 }
 
@@ -81,6 +84,9 @@ class Parser {
   private readonly easterOffsets: number[] = [];
   private readonly easterWords = new Set<EasterCalendar>();
   private easterSpan: Span | null = null;
+  private readonly setPositions: number[] = [];
+  private setPosGroup: 'weekday' | 'workday' | null = null;
+  private workdayFilter = false;
 
   constructor(
     private readonly input: string,
@@ -668,7 +674,25 @@ class Parser {
     return this.easterWords.values().next().value ?? 'orthodox';
   }
 
+  private setPosition(positions: readonly number[], dow: TokenOf<'dow'> & { readonly group: 'weekday' | 'workday' }): void {
+    this.index += 1;
+    this.takeUnit('day');
+    this.takeUnit('month');
+    this.rruleOnly('Nth working day of the month', dow.span);
+    if (this.setPosGroup !== null && this.setPosGroup !== dow.group) this.fail('CONFLICT', `Weekdays and working days cannot be mixed`, dow.span);
+    this.setPosGroup = dow.group;
+    for (const position of positions) {
+      if (position < -1 || position === 0 || position > 23) this.fail('OUT_OF_RANGE', `A month has at most 23 working days`, dow.span);
+      this.setPositions.push(position);
+    }
+  }
+
   private nthWeekday(nths: readonly number[], dow: TokenOf<'dow'>): void {
+    const { group } = dow;
+    if (group !== undefined) {
+      this.setPosition(nths, { ...dow, group });
+      return;
+    }
     this.index += 1;
     const [day] = dow.days;
     if (dow.days.length !== 1 || day === undefined) this.fail('UNEXPECTED_TOKEN', `Expected a single weekday after an ordinal`, dow.span);
@@ -682,6 +706,10 @@ class Parser {
 
   private lastPhrase(token: TokenOf<'last'>): void {
     const next = this.peek();
+    if (next?.t === 'dow' && next.group !== undefined) {
+      this.setPosition([-1], { ...next, group: next.group });
+      return;
+    }
     if (next?.t === 'dow') {
       this.nthWeekday([], next);
       const [day] = next.days;
@@ -699,7 +727,9 @@ class Parser {
   }
 
   private weekdayList(first: TokenOf<'dow'>): void {
+    const start = this.index - 1;
     const { values, span } = this.collectNames(first, 7, 0);
+    if (this.tokens.slice(start, this.index).some((token) => token.t === 'dow' && token.group === 'workday')) this.workdayFilter = true;
     this.weekdays = this.track(this.weekdays, values.map(weekdayOf), span);
     this.takeUnit('day');
   }
@@ -922,7 +952,7 @@ class Parser {
           freq = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }[coarse];
           step = coarseStep;
         } else if (this.easterOffsets.length > 0) freq = 'YEARLY';
-        else if (nth.length > 0) freq = 'MONTHLY';
+        else if (nth.length > 0 || this.setPositions.length > 0) freq = 'MONTHLY';
         else if (months !== null && (monthDays !== null || this.lastDay) && weekdays === null) freq = 'YEARLY';
         else if (monthDays !== null || this.lastDay) freq = 'MONTHLY';
         else if (weekdays !== null) freq = 'WEEKLY';
@@ -933,7 +963,10 @@ class Parser {
     if (nth.length > 0 && weekdays !== null) {
       this.fail('CONFLICT', `Every-week days and Nth weekdays cannot be mixed in one rule; split them into two`, weekdays.span);
     }
-    if (nth.length > 0 && freq !== 'MONTHLY' && freq !== 'YEARLY') {
+    if (this.setPositions.length > 0 && (weekdays !== null || nth.length > 0 || monthDays !== null || this.lastDay)) {
+      this.fail('CONFLICT', `An Nth working day cannot be combined with other day rules`, weekdays?.span ?? monthDays?.span ?? null);
+    }
+    if ((nth.length > 0 || this.setPositions.length > 0) && freq !== 'MONTHLY' && freq !== 'YEARLY') {
       this.fail('CONFLICT', `An Nth weekday needs a monthly or yearly schedule`, this.intervals.values().next().value?.span ?? null);
     }
 
@@ -952,7 +985,7 @@ class Parser {
     const weekly = freq === 'WEEKLY' || coarse === 'week';
     const monthly = !easter && (freq === 'MONTHLY' || freq === 'YEARLY' || coarse === 'month' || coarse === 'year');
     if (weekly && byDay.length === 0 && byMonthDay.length === 0) byDay.push({ nth: null, day: this.options.weeklyOn ?? 0 });
-    if (monthly && byMonthDay.length === 0 && byDay.length === 0) byMonthDay.push(1);
+    if (monthly && byMonthDay.length === 0 && byDay.length === 0 && this.setPositions.length === 0) byMonthDay.push(1);
     if (!easter && (freq === 'YEARLY' || coarse === 'year') && byMonth.length === 0 && byMonthDay.length > 0 && byDay.length === 0) byMonth.push(1);
 
     if (monthDays !== null && months !== null) {
@@ -973,6 +1006,9 @@ class Parser {
       byHour: allHours ? null : numbers(byHour),
       byMinute: numbers(byMinute),
       byEaster: [...this.easterOffsets],
+      bySetPos: [...this.setPositions],
+      setPosGroup: this.setPosGroup,
+      workdays: this.workdayFilter,
       easter: this.easterCalendar(),
     };
   }
@@ -985,12 +1021,19 @@ class Parser {
       }
       if (plan.byEaster.length > 1) this.fail('UNSUPPORTED', `An RRULE holds one Easter offset; split the dates into separate rules`, this.easterSpan);
     }
+    if (plan.setPosGroup === 'workday') {
+      this.fail('UNSUPPORTED', `Working days depend on public holidays, which RRULE cannot express; use occurrences with isWorkday`, null);
+    }
+    if (plan.bySetPos.length > 0 && ((plan.byHour?.length ?? 24) > 1 || (plan.byMinute?.length ?? 60) > 1)) {
+      this.fail('UNSUPPORTED', `BYSETPOS counts every time of day, so an Nth weekday needs a single time`, null);
+    }
     const names = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
     const parts = [`FREQ=${plan.freq}`];
     if (plan.interval > 1) parts.push(`INTERVAL=${plan.interval}`);
     if (plan.byMonth.length > 0) parts.push(`BYMONTH=${plan.byMonth.join(',')}`);
     if (plan.byMonthDay.length > 0) parts.push(`BYMONTHDAY=${plan.byMonthDay.join(',')}`);
     if (plan.byDay.length > 0) parts.push(`BYDAY=${plan.byDay.map(({ nth, day }) => `${nth ?? ''}${names[day] ?? ''}`).join(',')}`);
+    if (plan.bySetPos.length > 0) parts.push('BYDAY=MO,TU,WE,TH,FR', `BYSETPOS=${plan.bySetPos.join(',')}`);
     if (plan.byHour !== null) parts.push(`BYHOUR=${plan.byHour.join(',')}`);
     if (plan.byMinute !== null) parts.push(`BYMINUTE=${plan.byMinute.join(',')}`);
     if (plan.byEaster.length > 0) parts.push(`BYEASTER=${plan.byEaster.join(',')}`);

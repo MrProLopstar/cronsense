@@ -108,7 +108,7 @@ describe('cron still refuses what only RRULE can express', () => {
 const failures: ReadonlyArray<readonly [string, ErrorCode]> = [
   ['в последний', 'INCOMPLETE'],
   ['в шестой понедельник', 'OUT_OF_RANGE'],
-  ['в первый будний день', 'UNEXPECTED_TOKEN'],
+  ['в первый выходной', 'UNEXPECTED_TOKEN'],
   ['каждые 2 дня в первый понедельник', 'CONFLICT'],
   ['30 февраля', 'OUT_OF_RANGE'],
   ['в 9:00 и 18:30', 'UNSUPPORTED'],

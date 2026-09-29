@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.5.0
+
+- Working days: «в первый рабочий день месяца», «в последний рабочий день месяца», «в третий рабочий день», «по рабочим дням» in `occurrences` with an `isWorkday` predicate, for example from `@mrprolopstar/prodcal`
+- «будний день» and «рабочий день» are now distinct: weekday positions («в первый будний день месяца») become `BYSETPOS` in `toRRule`, working-day positions need a calendar
+- «в первый будний день» used to be an error and now parses
+
 ## 1.4.0
 
 - `occurrences(text, { from, to })`: dates in any window without a DTSTART; only true intervals need an `anchor`

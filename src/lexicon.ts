@@ -17,7 +17,7 @@ export type Lexeme =
   | { readonly t: 'before' }
   | { readonly t: 'unit'; readonly unit: Unit; readonly meridiem?: Meridiem }
   | { readonly t: 'freq'; readonly unit: Unit }
-  | { readonly t: 'dow'; readonly days: readonly Weekday[] }
+  | { readonly t: 'dow'; readonly days: readonly Weekday[]; readonly group?: 'weekday' | 'workday' }
   | { readonly t: 'month'; readonly month: number }
   | { readonly t: 'meridiem'; readonly meridiem: Meridiem }
   | { readonly t: 'clock'; readonly hour: 0 | 12 }
@@ -94,7 +94,8 @@ const RULES: readonly Rule[] = [
   [/^(?:пятниц(?:а|у|ам|ы|е)|пт|fridays?|fri)$/, dow(5)],
   [/^(?:суббот(?:а|у|ам|ы|е)|сб|saturdays?|sat)$/, dow(6)],
   [/^(?:воскресень(?:е|я|ям|ю)|вс|sundays?|sun)$/, dow(0)],
-  [/^(?:будн[а-я]*|рабоч[а-я]*|weekdays?|workdays?)$/, { t: 'dow', days: WEEKDAYS }],
+  [/^(?:будн[а-я]*|weekdays?)$/, { t: 'dow', days: WEEKDAYS, group: 'weekday' }],
+  [/^(?:рабоч[а-я]*|workdays?|working|business)$/, { t: 'dow', days: WEEKDAYS, group: 'workday' }],
   [/^(?:выходн[а-я]*|weekends?)$/, { t: 'dow', days: WEEKEND }],
 
   [/^(?:январ[а-яь]*|january|jan)$/, month(1)],

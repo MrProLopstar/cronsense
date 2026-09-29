@@ -10,6 +10,8 @@ export interface OccurrenceOptions extends ParseOptions {
   readonly anchor?: Date;
   readonly timezone?: Timezone;
   readonly limit?: number;
+  /** Working-day predicate for «рабочий день», for example `isWorkday` from `@mrprolopstar/prodcal`. Receives `YYYY-MM-DD`. */
+  readonly isWorkday?: (date: string) => boolean;
 }
 
 const DAY = 86_400_000;
@@ -32,6 +34,9 @@ const UTC: Clock = {
 const dayNumber = (year: number, month: number, day: number): number => Math.round(Date.UTC(year, month - 1, day) / DAY);
 
 const range = (count: number): number[] => Array.from({ length: count }, (_, index) => index);
+
+const isoDay = (year: number, month: number, day: number): string =>
+  `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 /**
  * Lists the moments a schedule fires between `from` and `to`, both inclusive, without a DTSTART.
@@ -57,7 +62,28 @@ export const occurrences = (input: string, options: OccurrenceOptions): Date[] =
     throw new CronsenseError('INCOMPLETE', `"${input}" repeats every ${plan.interval} ${unit}; pass an anchor date to count them from`, input);
   }
 
+  const { isWorkday } = options;
+  if (plan.setPosGroup === 'workday' && isWorkday === undefined) {
+    throw new CronsenseError('INCOMPLETE', `"${input}" needs a working-day calendar; pass isWorkday, for example from @mrprolopstar/prodcal`, input);
+  }
   const clock = options.timezone === 'utc' ? UTC : LOCAL;
+  const positionCache = new Map<number, ReadonlySet<number>>();
+  const positions = (year: number, month: number): ReadonlySet<number> => {
+    const key = year * 12 + month;
+    const cached = positionCache.get(key);
+    if (cached !== undefined) return cached;
+    const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const candidates = range(length)
+      .map((index) => index + 1)
+      .filter((day) =>
+        plan.setPosGroup === 'workday' && isWorkday !== undefined
+          ? isWorkday(isoDay(year, month, day))
+          : ![0, 6].includes(new Date(Date.UTC(year, month - 1, day)).getUTCDay()),
+      );
+    const chosen = new Set(plan.bySetPos.map((position) => candidates.at(position > 0 ? position - 1 : position)).filter((day) => day !== undefined));
+    positionCache.set(key, chosen);
+    return chosen;
+  };
   const hours = plan.byHour ?? range(24);
   const minutes = plan.byMinute ?? range(60);
   const easterCache = new Map<number, number>();
@@ -79,7 +105,13 @@ export const occurrences = (input: string, options: OccurrenceOptions): Date[] =
     const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
     if (plan.byMonth.length > 0 && !plan.byMonth.includes(month)) return false;
     if (plan.byMonthDay.length > 0 && !plan.byMonthDay.some((value) => (value > 0 ? value === day : length + value + 1 === day))) return false;
+    if (plan.bySetPos.length > 0 && !positions(year, month).has(day)) return false;
+    const workday = plan.workdays && isWorkday !== undefined;
+    if (workday && !(isWorkday(isoDay(year, month, day)) || plan.byDay.some(({ nth, day: target }) => nth === null && target === weekday && (target === 0 || target === 6)))) {
+      return false;
+    }
     if (
+      !workday &&
       plan.byDay.length > 0 &&
       !plan.byDay.some(({ nth, day: target }) => {
         if (target !== weekday) return false;

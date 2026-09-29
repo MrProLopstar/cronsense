@@ -113,6 +113,20 @@ occurrences('каждые 2 недели по понедельникам в 19:0
 
 Options: `timezone` (`'local'` by default or `'utc'`), `limit` (10 000 by default), plus all parse options. The results are checked against rrule.js on tens of thousands of random phrases.
 
+## Working days
+
+`occurrences` understands the Russian production calendar when you pass a working-day predicate, for example from [prodcal](https://jsr.io/@mrprolopstar/prodcal). cronsense itself stays dependency-free, so any country's calendar works.
+
+```ts
+import { isWorkday } from '@mrprolopstar/prodcal';
+
+occurrences('в первый рабочий день месяца в 9:00', { from, to, isWorkday });  // 2026-01-12, 2026-02-02, ...
+occurrences('в последний рабочий день месяца в 18:00', { from, to, isWorkday }); // 2026-12-30, not the 31st
+occurrences('по рабочим дням в 9:30', { from, to, isWorkday });              // skips holidays, keeps working Saturdays
+```
+
+«Будний день» always means Monday to Friday, so «в первый будний день месяца» also works in `toRRule` as `BYSETPOS`. «Рабочий день» depends on holidays, which neither cron nor RRULE can express: `toRRule` refuses it, and in cron «по рабочим дням» stays Monday to Friday.
+
 ## Easter
 
 Russian «Пасха» means Orthodox Easter by default, English "Easter" means Western; «православная», «католическая», "orthodox", "western" or the `easter` option choose explicitly.
