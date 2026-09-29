@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.4.0
+
+- `occurrences(text, { from, to })`: dates in any window without a DTSTART; only true intervals need an `anchor`
+- Easter: «в Пасху», «за 7 дней до Пасхи», «через 49 дней после Пасхи», «на 50-й день после Пасхи», "49 days after easter"; Orthodox by default for «Пасха», Western for "Easter", selectable with words or the `easter` option
+- `easterDate(year, calendar)` for both computuses, checked on every year from 1583 to 4099
+- `toRRule` writes Western Easter as `BYEASTER` and refuses Orthodox Easter, which `BYEASTER` cannot express
+- Mixing every-week days with Nth weekdays («по понедельникам и в первую пятницу») is rejected, because rrule.js misreads such rules
+
 ## 1.3.0
 
 - `toRRule`: iCalendar RRULE output, including every N weeks, the last day of the month («в последний день месяца»), the Nth weekday («в первый понедельник месяца», «в последнюю пятницу»), intervals longer than cron allows and day-of-month AND weekday

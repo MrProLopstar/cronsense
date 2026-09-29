@@ -108,6 +108,8 @@ export const toCron = (input: string, options: ParseOptions = {}): string => par
 
 export { parse };
 export { toRRule } from './parser.js';
+export { occurrences, type OccurrenceOptions } from './occurrences.js';
+export { easterDate } from './easter.js';
 export { parseCron } from './cron.js';
 export { describe, type DescribeOptions, type Locale } from './describe.js';
 export { nextRuns } from './next.js';
@@ -115,6 +117,7 @@ export { formatCron } from './field.js';
 export { CronsenseError, isCronsenseError, type ErrorCode } from './errors.js';
 export type {
   CronField,
+  EasterCalendar,
   CronFields,
   FieldName,
   NextRunsOptions,

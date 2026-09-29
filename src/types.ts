@@ -37,7 +37,12 @@ export interface ParseOptions {
   readonly weeklyOn?: Weekday;
   /** Reject hours 1–12 without «утра»/«вечера» or am/pm instead of reading them as morning. */
   readonly strictHours?: boolean;
+  /** Easter computus: «Пасха» defaults to Orthodox, "Easter" to Western. */
+  readonly easter?: EasterCalendar;
 }
+
+/** Which Easter date to use. */
+export type EasterCalendar = 'orthodox' | 'western';
 
 /** Time zone used to compute run times. */
 export type Timezone = 'local' | 'utc';

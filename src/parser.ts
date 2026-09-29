@@ -1,7 +1,19 @@
 import { CronsenseError, type ErrorCode } from './errors.js';
 import { ANY, DAYS_IN_MONTH, expandField, formatCron, stepField, valuesField } from './field.js';
 import { tokenize, type Token, type TokenOf } from './lexer.js';
-import type { CronField, CronFields, Meridiem, ParseOptions, Schedule, Span, Unit, Weekday } from './types.js';
+import type { CronField, CronFields, EasterCalendar, Meridiem, ParseOptions, Schedule, Span, Unit, Weekday } from './types.js';
+
+export interface Plan {
+  readonly freq: 'MINUTELY' | 'HOURLY' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  readonly interval: number;
+  readonly byMonth: readonly number[];
+  readonly byMonthDay: readonly number[];
+  readonly byDay: readonly { readonly nth: number | null; readonly day: Weekday }[];
+  readonly byHour: readonly number[] | null;
+  readonly byMinute: readonly number[] | null;
+  readonly byEaster: readonly number[];
+  readonly easter: EasterCalendar;
+}
 
 interface Interval {
   readonly unit: Unit;
@@ -66,6 +78,9 @@ class Parser {
 
   private readonly nthWeekdays: Array<{ readonly nth: number; readonly day: Weekday }> = [];
   private lastDay = false;
+  private readonly easterOffsets: number[] = [];
+  private readonly easterWords = new Set<EasterCalendar>();
+  private easterSpan: Span | null = null;
 
   constructor(
     private readonly input: string,
@@ -85,13 +100,18 @@ class Parser {
     return this.rrule();
   }
 
+  runPlan(): Plan {
+    this.consume();
+    return this.plan();
+  }
+
   private consume(): void {
     if (this.tokens.length === 0) this.fail('EMPTY_INPUT', 'Schedule description is empty', null);
     while (this.peek() !== undefined) this.clause();
   }
 
   private rruleOnly(feature: string, span: Span): void {
-    if (this.target === 'cron') this.fail('UNSUPPORTED', `Not expressible in cron: ${feature}; use toRRule`, span);
+    if (this.target === 'cron') this.fail('UNSUPPORTED', `Not expressible in cron: ${feature}; use toRRule or occurrences`, span);
   }
 
   private fail(code: ErrorCode, message: string, span: Span | null): never {
@@ -164,6 +184,7 @@ class Parser {
   }
 
   private clause(): void {
+    if (this.easterPhrase()) return;
     const token = this.advance();
     const at = this.atContext;
     this.atContext = false;
@@ -217,7 +238,16 @@ class Parser {
       case 'meridiem':
       case 'domMarker':
       case 'dash':
+      case 'easter':
+      case 'easterKind':
+      case 'after':
+      case 'before':
         this.unexpected(token);
+        return;
+      default: {
+        const unhandled: never = token;
+        this.unexpected(unhandled);
+      }
     }
   }
 
@@ -605,6 +635,39 @@ class Parser {
     }
   }
 
+  private easterPhrase(): boolean {
+    let offset = 0;
+    if (this.kindAt(0) === 'other' && this.kindAt(1) === 'num') offset = 1;
+    const amount = this.peek(offset);
+    const unit = this.peek(offset + 1);
+    const direction = this.peek(offset + 2);
+    let days = 0;
+    let length = 0;
+    if (amount?.t === 'num' && unit?.t === 'unit' && unit.unit === 'day' && (direction?.t === 'after' || direction?.t === 'before' || (direction?.t === 'to' && !direction.weak))) {
+      const count = amount.ordinal ? amount.value - 1 : amount.value;
+      days = direction.t === 'after' ? count : -count;
+      length = offset + 3;
+    }
+    const kind = this.peek(length);
+    const easterAt = kind?.t === 'easterKind' ? length + 1 : length;
+    const easter = this.peek(easterAt);
+    if (easter?.t !== 'easter') return false;
+    const start = this.peek(0)?.span ?? easter.span;
+    this.index += easterAt + 1;
+    const span = join(start, easter.span);
+    this.rruleOnly('dates relative to Easter', span);
+    this.easterWords.add(kind?.t === 'easterKind' ? kind.calendar : easter.calendar);
+    this.easterOffsets.push(days);
+    this.easterSpan = this.easterSpan === null ? span : join(this.easterSpan, span);
+    return true;
+  }
+
+  private easterCalendar(): EasterCalendar {
+    if (this.options.easter !== undefined) return this.options.easter;
+    if (this.easterWords.size > 1) this.fail('CONFLICT', `Both Orthodox and Western Easter are mentioned`, this.easterSpan);
+    return this.easterWords.values().next().value ?? 'orthodox';
+  }
+
   private nthWeekday(nths: readonly number[], dow: TokenOf<'dow'>): void {
     this.index += 1;
     const [day] = dow.days;
@@ -804,7 +867,7 @@ class Parser {
     return { dayOfMonth, month, dayOfWeek };
   }
 
-  private rrule(): string {
+  plan(): Plan {
     const interval = (unit: Unit): Interval | undefined => this.intervals.get(unit);
     const minutes = interval('minute');
     const hours = interval('hour');
@@ -815,7 +878,6 @@ class Parser {
     const marks = this.minuteMarks.map((mark) => mark.minute);
     const list = (values: Iterable<number>): string => [...new Set(values)].sort((a, b) => a - b).join(',');
     const hoursOf = (field: CronField): number[] => [...expandField('hour', field)];
-    const parts: string[] = [];
     let byHour: string | null = null;
     let byMinute: string | null = null;
     let freq: string;
@@ -859,7 +921,8 @@ class Parser {
         if (coarse !== undefined) {
           freq = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }[coarse];
           step = coarseStep;
-        } else if (nth.length > 0) freq = 'MONTHLY';
+        } else if (this.easterOffsets.length > 0) freq = 'YEARLY';
+        else if (nth.length > 0) freq = 'MONTHLY';
         else if (months !== null && (monthDays !== null || this.lastDay) && weekdays === null) freq = 'YEARLY';
         else if (monthDays !== null || this.lastDay) freq = 'MONTHLY';
         else if (weekdays !== null) freq = 'WEEKLY';
@@ -867,26 +930,30 @@ class Parser {
       }
     }
 
+    if (nth.length > 0 && weekdays !== null) {
+      this.fail('CONFLICT', `Every-week days and Nth weekdays cannot be mixed in one rule; split them into two`, weekdays.span);
+    }
     if (nth.length > 0 && freq !== 'MONTHLY' && freq !== 'YEARLY') {
       this.fail('CONFLICT', `An Nth weekday needs a monthly or yearly schedule`, this.intervals.values().next().value?.span ?? null);
     }
 
-    const byMonth = months === null || months.values.size === 12 ? null : list(months.values);
-    const days = [...(monthDays?.values ?? [])].sort((a, b) => a - b).map(String);
-    if (this.lastDay) days.push('-1');
-    const names = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-    const byDay = [
-      ...[...(weekdays?.values ?? [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((day) => names[day] ?? ''),
-      ...nth.map(({ nth: index, day }) => `${index}${names[day] ?? ''}`),
+    const byMonth = months === null || months.values.size === 12 ? [] : [...months.values].sort((a, b) => a - b);
+    const byMonthDay = [...(monthDays?.values ?? [])].sort((a, b) => a - b);
+    if (this.lastDay) byMonthDay.push(-1);
+    const byDay: { readonly nth: number | null; readonly day: Weekday }[] = [
+      ...[...(weekdays?.values ?? [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((day) => ({ nth: null, day })),
+      ...nth.map(({ nth: index, day }) => ({ nth: index, day })),
     ];
     const finer = !['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq) || (coarse !== undefined && freq === 'DAILY' && coarse !== 'day');
     if (finer && coarse !== undefined && coarseStep > 1) {
       this.fail('UNSUPPORTED', `An interval of several ${coarse}s cannot be combined with minutes or hours in one RRULE`, interval(coarse)?.span ?? null);
     }
+    const easter = this.easterOffsets.length > 0;
     const weekly = freq === 'WEEKLY' || coarse === 'week';
-    const monthly = freq === 'MONTHLY' || freq === 'YEARLY' || coarse === 'month' || coarse === 'year';
-    if (weekly && byDay.length === 0 && days.length === 0) byDay.push(names[this.options.weeklyOn ?? 0] ?? 'SU');
-    if (monthly && days.length === 0 && byDay.length === 0) days.push('1');
+    const monthly = !easter && (freq === 'MONTHLY' || freq === 'YEARLY' || coarse === 'month' || coarse === 'year');
+    if (weekly && byDay.length === 0 && byMonthDay.length === 0) byDay.push({ nth: null, day: this.options.weeklyOn ?? 0 });
+    if (monthly && byMonthDay.length === 0 && byDay.length === 0) byMonthDay.push(1);
+    if (!easter && (freq === 'YEARLY' || coarse === 'year') && byMonth.length === 0 && byMonthDay.length > 0 && byDay.length === 0) byMonth.push(1);
 
     if (monthDays !== null && months !== null) {
       const longest = Math.max(...[...months.values].map((value) => DAYS_IN_MONTH[value - 1] ?? 31));
@@ -895,14 +962,38 @@ class Parser {
       }
     }
 
-    parts.push(`FREQ=${freq}`);
-    if (step > 1) parts.push(`INTERVAL=${step}`);
-    if ((freq === 'YEARLY' || coarse === 'year') && byMonth === null && days.length > 0 && byDay.length === 0) parts.push('BYMONTH=1');
-    if (byMonth !== null) parts.push(`BYMONTH=${byMonth}`);
-    if (days.length > 0) parts.push(`BYMONTHDAY=${days.join(',')}`);
-    if (byDay.length > 0) parts.push(`BYDAY=${byDay.join(',')}`);
-    if (byHour !== null && byHour !== list(Array.from({ length: 24 }, (_, hour) => hour))) parts.push(`BYHOUR=${byHour}`);
-    if (byMinute !== null) parts.push(`BYMINUTE=${byMinute}`);
+    const numbers = (value: string | null): number[] | null => (value === null ? null : value.split(',').map(Number));
+    const allHours = byHour === list(Array.from({ length: 24 }, (_, hour) => hour));
+    return {
+      freq: freq as Plan['freq'],
+      interval: step,
+      byMonth,
+      byMonthDay,
+      byDay,
+      byHour: allHours ? null : numbers(byHour),
+      byMinute: numbers(byMinute),
+      byEaster: [...this.easterOffsets],
+      easter: this.easterCalendar(),
+    };
+  }
+
+  private rrule(): string {
+    const plan = this.plan();
+    if (plan.byEaster.length > 0) {
+      if (plan.easter === 'orthodox') {
+        this.fail('UNSUPPORTED', `RRULE BYEASTER (rrule.js, python-dateutil) only knows Western Easter; use occurrences() for Orthodox Easter`, this.easterSpan);
+      }
+      if (plan.byEaster.length > 1) this.fail('UNSUPPORTED', `An RRULE holds one Easter offset; split the dates into separate rules`, this.easterSpan);
+    }
+    const names = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+    const parts = [`FREQ=${plan.freq}`];
+    if (plan.interval > 1) parts.push(`INTERVAL=${plan.interval}`);
+    if (plan.byMonth.length > 0) parts.push(`BYMONTH=${plan.byMonth.join(',')}`);
+    if (plan.byMonthDay.length > 0) parts.push(`BYMONTHDAY=${plan.byMonthDay.join(',')}`);
+    if (plan.byDay.length > 0) parts.push(`BYDAY=${plan.byDay.map(({ nth, day }) => `${nth ?? ''}${names[day] ?? ''}`).join(',')}`);
+    if (plan.byHour !== null) parts.push(`BYHOUR=${plan.byHour.join(',')}`);
+    if (plan.byMinute !== null) parts.push(`BYMINUTE=${plan.byMinute.join(',')}`);
+    if (plan.byEaster.length > 0) parts.push(`BYEASTER=${plan.byEaster.join(',')}`);
     return parts.join(';');
   }
 }
@@ -931,3 +1022,6 @@ export const parse = (input: string, options: ParseOptions = {}): Schedule =>
  */
 export const toRRule = (input: string, options: ParseOptions = {}): string =>
   new Parser(input, tokenize(input), options, 'rrule').runRRule();
+
+export const toPlan = (input: string, options: ParseOptions = {}): Plan =>
+  new Parser(input, tokenize(input), options, 'rrule').runPlan();

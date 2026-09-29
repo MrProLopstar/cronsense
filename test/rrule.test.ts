@@ -113,6 +113,7 @@ const failures: ReadonlyArray<readonly [string, ErrorCode]> = [
   ['30 февраля', 'OUT_OF_RANGE'],
   ['в 9:00 и 18:30', 'UNSUPPORTED'],
   ['с 9 до 18', 'INCOMPLETE'],
+  ['по понедельникам и в первую пятницу', 'CONFLICT'],
 ];
 
 describe('toRRule errors', () => {

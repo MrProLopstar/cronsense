@@ -1,4 +1,4 @@
-import type { Meridiem, Unit, Weekday } from './types.js';
+import type { EasterCalendar, Meridiem, Unit, Weekday } from './types.js';
 
 export type Lexeme =
   | { readonly t: 'every' }
@@ -11,6 +11,10 @@ export type Lexeme =
   | { readonly t: 'quarter' }
   | { readonly t: 'without' }
   | { readonly t: 'last' }
+  | { readonly t: 'easter'; readonly calendar: EasterCalendar }
+  | { readonly t: 'easterKind'; readonly calendar: EasterCalendar }
+  | { readonly t: 'after' }
+  | { readonly t: 'before' }
   | { readonly t: 'unit'; readonly unit: Unit; readonly meridiem?: Meridiem }
   | { readonly t: 'freq'; readonly unit: Unit }
   | { readonly t: 'dow'; readonly days: readonly Weekday[] }
@@ -119,9 +123,15 @@ const RULES: readonly Rule[] = [
   [/^(?:в|во|на|at|on|in|per|a|an)$/, { t: 'at' }],
   [/^(?:числа|число|числам)$/, { t: 'domMarker' }],
 
-  [/^(?:the|of|o|clock|ровно|дни|дням|днями|also|также|past)$/, { t: 'noise' }],
+  [/^(?:the|of|o|clock|ровно|дни|дням|днями|also|также|past|за)$/, { t: 'noise' }],
 
   [/^(?:последн[а-я]*|last)$/, { t: 'last' }],
+  [/^(?:пасх[аиуеой]|пасхой)$/, { t: 'easter', calendar: 'orthodox' }],
+  [/^easter$/, { t: 'easter', calendar: 'western' }],
+  [/^(?:православн[а-я]*|orthodox)$/, { t: 'easterKind', calendar: 'orthodox' }],
+  [/^(?:католическ[а-я]*|западн[а-я]*|western|catholic)$/, { t: 'easterKind', calendar: 'western' }],
+  [/^(?:после|after)$/, { t: 'after' }],
+  [/^before$/, { t: 'before' }],
   [/^(?:секунд[а-я]*|seconds?|secs?)$/, { t: 'unsupported', feature: 'second-level precision' }],
   [/^(?:кроме|except|excluding)$/, { t: 'unsupported', feature: 'exclusions' }],
   [/^(?:десятилет[а-я]*|век[аеу]?|веков|столет[а-я]*|decades?|centur(?:y|ies))$/, { t: 'unsupported', feature: 'intervals longer than a year' }],

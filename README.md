@@ -100,6 +100,34 @@ toRRule('по понедельникам 1 числа');              // 'FREQ=M
 
 Steps that divide the hour or the day (every 15 minutes, every 2 hours) become explicit `BYMINUTE`/`BYHOUR` lists, so they do not depend on `DTSTART`. Only true intervals (every 90 minutes, every 3 days, every 2 weeks) use `INTERVAL` and count from `DTSTART`. Tests compare the rules with [rrule.js](https://github.com/jkbrzt/rrule) occurrence by occurrence. CLI: `--rrule`; MCP: `to_rrule`.
 
+## Dates without DTSTART
+
+`occurrences(text, { from, to })` lists the moments a schedule fires in any window, forward or backward, without a DTSTART. Only true intervals («каждые 2 недели», every 90 minutes) need an `anchor` to know which weeks count.
+
+```ts
+occurrences('по пятницам в 19:00', { from: new Date(2026, 9, 1), to: new Date(2026, 9, 31) });
+// Fridays of October 2026 at 19:00
+
+occurrences('каждые 2 недели по понедельникам в 19:00', { from, to, anchor: new Date(2026, 0, 5) });
+```
+
+Options: `timezone` (`'local'` by default or `'utc'`), `limit` (10 000 by default), plus all parse options. The results are checked against rrule.js on tens of thousands of random phrases.
+
+## Easter
+
+Russian «Пасха» means Orthodox Easter by default, English "Easter" means Western; «православная», «католическая», "orthodox", "western" or the `easter` option choose explicitly.
+
+```ts
+occurrences('в Пасху', { from, to });                          // 2026-04-12, 2027-05-02
+occurrences('через 49 дней после Пасхи', { from, to });        // Trinity: 2026-05-31
+occurrences('на 50-й день после Пасхи', { from, to });         // the same, counting Easter as day 1
+occurrences('за 46 дней до католической Пасхи', { from, to }); // Ash Wednesday: 2026-02-18
+toRRule('49 days after easter');                               // 'FREQ=YEARLY;BYHOUR=0;BYMINUTE=0;BYEASTER=49'
+easterDate(2026, 'orthodox');                                  // { month: 4, day: 12 }
+```
+
+`BYEASTER` is a non-standard extension of rrule.js and python-dateutil that only knows Western Easter, so `toRRule` refuses Orthodox Easter and points to `occurrences`. Cron cannot express Easter at all.
+
 ## With your scheduler
 
 cronsense only produces cron strings, so it works with any scheduler:
@@ -167,6 +195,8 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 | `nextRuns(schedule \| expression, options?)` | Next run times; options: `count` (default 5), `from`, `timezone` (`'local'` or `'utc'`) |
 | `describe(schedule \| expression, options?)` | Natural-language description; `locale`: `'en'` (default) or `'ru'` |
 | `toRRule(text, options?)` | iCalendar RRULE string, see [RRULE](#rrule) |
+| `occurrences(text, { from, to, anchor?, timezone?, limit? })` | Moments in a window without DTSTART, including Orthodox Easter |
+| `easterDate(year, 'orthodox' \| 'western')` | Easter Sunday of a year |
 | `formatCron(fields)` | Formats structured fields back into a cron string |
 
 `ParseOptions.strictHours` rejects hours 1–12 without «утра»/«вечера» or am/pm with `AMBIGUOUS` instead of reading them as morning: «без шести семь» fails, «без шести семь вечера», «в 19:00» and «в 09:30» pass. Use it where a wrong guess is costly, for example in reminder bots. CLI: `--strict-hours`; MCP: `strictHours`.
