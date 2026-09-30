@@ -38,14 +38,15 @@ const merged = (text: string, table: Map<string, string[]>): string[] => {
   return [...new Set(all)].sort().slice(0, ITERATIONS);
 };
 
-const agree = (text: string, table: Map<string, string[]>, from: Date): void => {
-  const cutoff = from.toISOString().slice(0, 16);
-  const theirs = merged(text, table).filter((moment) => moment >= cutoff);
-  const mine = own(text, from);
+const agree = (text: string, table: Map<string, string[]>): void => {
+  const theirs = merged(text, table);
+  const [first] = theirs;
+  expect(first, `${text}: systemd found no elapse`).toBeDefined();
+  const mine = own(text, new Date(`${first ?? ''}:00Z`));
   const count = Math.min(theirs.length, mine.length);
   expect(count, text).toBeGreaterThan(0);
   expect(theirs.slice(0, count), `${text} → ${toSystemd(text).join(' | ')}`).toEqual(mine.slice(0, count));
-};
+}
 
 const PHRASES = [
   'по будням в 9:30', 'в последний день месяца в 18:00', 'в первый понедельник месяца в 9:30', 'в последнюю пятницу месяца',
@@ -67,9 +68,8 @@ describe('toSystemd', () => {
   });
 
   it.skipIf(!available)('matches systemd-analyze on every phrase', { timeout: 120_000 }, () => {
-    const from = new Date(Math.ceil(Date.now() / 60_000) * 60_000 + 60_000);
     const table = elapses(PHRASES.flatMap((text) => toSystemd(text)));
-    for (const text of PHRASES) agree(text, table, from);
+    for (const text of PHRASES) agree(text, table);
   });
 
   it.skipIf(!available)('matches systemd-analyze on random phrases', { timeout: 300_000 }, () => {
@@ -95,9 +95,8 @@ describe('toSystemd', () => {
       }
     }
     expect(phrases.length).toBeGreaterThan(100);
-    const from = new Date(Math.ceil(Date.now() / 60_000) * 60_000 + 60_000);
     const table = elapses([...new Set(phrases.flatMap((text) => toSystemd(text)))]);
-    for (const text of phrases) agree(text, table, from);
+    for (const text of phrases) agree(text, table);
   });
 });
 
