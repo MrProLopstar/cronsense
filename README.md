@@ -2,6 +2,7 @@
 
 **English** · [Русский](README.ru.md)
 
+[![npm](https://img.shields.io/npm/v/cronsense)](https://www.npmjs.com/package/cronsense)
 [![JSR](https://jsr.io/badges/@mrprolopstar/cronsense)](https://jsr.io/@mrprolopstar/cronsense)
 [![JSR Score](https://jsr.io/badges/@mrprolopstar/cronsense/score)](https://jsr.io/@mrprolopstar/cronsense/score)
 [![CI](https://github.com/MrProLopstar/cronsense/actions/workflows/ci.yml/badge.svg)](https://github.com/MrProLopstar/cronsense/actions/workflows/ci.yml)
@@ -31,25 +32,21 @@ mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
 ## Install
 
 ```bash
+npm install cronsense
+```
+
+The same package is published to [JSR](https://jsr.io/@mrprolopstar/cronsense) for Deno and Bun:
+
+```bash
 npx jsr add @mrprolopstar/cronsense
 ```
 
-From GitHub Packages (needs a `.npmrc` line `@mrprolopstar:registry=https://npm.pkg.github.com` and a GitHub token with `read:packages`):
-
-```bash
-npm install @mrprolopstar/cronsense
-```
-
-Or straight from GitHub:
-
-```bash
-npm install github:MrProLopstar/cronsense
-```
+It is also available from GitHub Packages as `@mrprolopstar/cronsense` and straight from the repository with `npm install github:MrProLopstar/cronsense`.
 
 ## Usage
 
 ```ts
-import { describe, nextRuns, parse, safeParse, toCron } from '@mrprolopstar/cronsense';
+import { describe, nextRuns, parse, safeParse, toCron } from 'cronsense';
 
 toCron('каждый день в 9 утра');
 // '0 9 * * *'
@@ -132,7 +129,7 @@ Options: `timezone` (`'local'` by default or `'utc'`), `limit` (10 000 by defaul
 `occurrences` understands the Russian production calendar when you pass a working-day predicate, for example from [prodcal](https://jsr.io/@mrprolopstar/prodcal). cronsense itself stays dependency-free, so any country's calendar works.
 
 ```ts
-import { isWorkday } from '@mrprolopstar/prodcal';
+import { isWorkday } from 'prodcal';
 
 occurrences('в первый рабочий день месяца в 9:00', { from, to, isWorkday });  // 2026-01-12, 2026-02-02, ...
 occurrences('в последний рабочий день месяца в 18:00', { from, to, isWorkday }); // 2026-12-30, not the 31st
@@ -180,14 +177,14 @@ cronsense only produces cron strings, so it works with any scheduler:
 
 ```ts
 import cron from 'node-cron';
-import { toCron } from '@mrprolopstar/cronsense';
+import { toCron } from 'cronsense';
 
 cron.schedule(toCron('по будням в 9:30'), sendDailyReport);
 ```
 
 ```ts
 import { Queue } from 'bullmq';
-import { toCron } from '@mrprolopstar/cronsense';
+import { toCron } from 'cronsense';
 
 await new Queue('reports').add('weekly', {}, { repeat: { pattern: toCron('every monday at 8am') } });
 ```
@@ -212,7 +209,7 @@ LLMs regularly produce subtly wrong cron. `cronsense-mcp` gives agents determini
 Claude Code:
 
 ```bash
-claude mcp add cronsense -- npx -y -p github:MrProLopstar/cronsense cronsense-mcp
+claude mcp add cronsense -- npx -y -p cronsense cronsense-mcp
 ```
 
 Claude Desktop, Cursor and other clients (`mcpServers` config):
@@ -222,7 +219,7 @@ Claude Desktop, Cursor and other clients (`mcpServers` config):
   "mcpServers": {
     "cronsense": {
       "command": "npx",
-      "args": ["-y", "-p", "github:MrProLopstar/cronsense", "cronsense-mcp"]
+      "args": ["-y", "-p", "cronsense", "cronsense-mcp"]
     }
   }
 }
