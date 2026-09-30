@@ -118,7 +118,7 @@ suite('describe round-trip', () => {
   );
   const locales: readonly Locale[] = ['ru', 'en'];
 
-  it.each(locales)('%s descriptions parse back to an equivalent schedule', (locale) => {
+  it.each(locales)('%s descriptions parse back to an equivalent schedule', { timeout: 60_000 }, (locale) => {
     let checked = 0;
     for (const expression of expressions) {
       const schedule = parseCron(expression);

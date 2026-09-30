@@ -1,6 +1,6 @@
 import { formatField, FIELD_ORDER } from '../src/field.js';
 import { isWorkday, lastYear, ProdcalError } from '@mrprolopstar/prodcal';
-import { CronsenseError, describe, nextRuns, occurrences, parse, parseCron, toRRule, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
+import { CronsenseError, describe, nextRuns, occurrences, parse, parseCron, toRRule, toSystemd, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
 
 type Mode = 'text' | 'cron' | 'dates';
 
@@ -221,6 +221,13 @@ const showDates = (value: string): void => {
     dates = occurrences(value, { ...options, to: new Date(lastYear, 11, 31, 23, 59) });
     note = text.calendarLimit.replace('{year}', String(lastYear));
   }
+  let systemd: string[] = [];
+  try {
+    systemd = toSystemd(value);
+  } catch (failure: unknown) {
+    if (!(failure instanceof CronsenseError)) throw failure;
+  }
+  if (systemd.length > 0) note = [systemd.map((line) => `OnCalendar=${line}`).join('   '), note].filter(Boolean).join('. ');
   if (rule !== null && /рабоч|working|workday|business/i.test(value)) note = [text.weekdaysOnly, note].filter(Boolean).join('. ');
   cron.textContent = rule ?? text.noRRule;
   cron.classList.add('rule');

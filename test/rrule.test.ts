@@ -47,7 +47,8 @@ const rrules: ReadonlyArray<readonly [string, string]> = [
   ['on the last friday of the month at 5pm', 'FREQ=MONTHLY;BYDAY=-1FR;BYHOUR=17;BYMINUTE=0'],
   ['first monday of the month at 9am', 'FREQ=MONTHLY;BYDAY=1MO;BYHOUR=9;BYMINUTE=0'],
   ['по понедельникам 1 числа', 'FREQ=MONTHLY;BYMONTHDAY=1;BYDAY=MO;BYHOUR=0;BYMINUTE=0'],
-  ['каждые 3 месяца', 'FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=1;BYHOUR=0;BYMINUTE=0'],
+  ['каждые 3 месяца', 'FREQ=YEARLY;BYMONTH=1,4,7,10;BYMONTHDAY=1;BYHOUR=0;BYMINUTE=0'],
+  ['каждые 5 месяцев', 'FREQ=MONTHLY;INTERVAL=5;BYMONTHDAY=1;BYHOUR=0;BYMINUTE=0'],
   ['ежегодно', 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1;BYHOUR=0;BYMINUTE=0'],
   ['каждые 2 года', 'FREQ=YEARLY;INTERVAL=2;BYMONTH=1;BYMONTHDAY=1;BYHOUR=0;BYMINUTE=0'],
   ['15 января в 10 утра', 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=15;BYHOUR=10;BYMINUTE=0'],
@@ -114,6 +115,8 @@ const failures: ReadonlyArray<readonly [string, ErrorCode]> = [
   ['в 9:00 и 18:30', 'UNSUPPORTED'],
   ['с 9 до 18', 'INCOMPLETE'],
   ['по понедельникам и в первую пятницу', 'CONFLICT'],
+  ['в последнюю пятницу 1 числа', 'CONFLICT'],
+  ['в первый понедельник 15 января', 'CONFLICT'],
 ];
 
 describe('toRRule errors', () => {

@@ -10,7 +10,7 @@ export type Token =
   | Spanned<{ readonly t: 'time'; readonly hour: number; readonly minute: number; readonly padded: boolean }>
   | Spanned<{ readonly t: 'dash' }>
   | Spanned<{ readonly t: 'holiday'; readonly holiday: Holiday }>
-  | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'cardinal' | 'halfOf' | 'halfHour' | 'unsupported' }>>;
+  | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'cardinal' | 'halfOf' | 'amount' | 'unsupported' }>>;
 
 export type TokenOf<K extends Token['t']> = Extract<Token, { readonly t: K }>;
 
@@ -99,8 +99,9 @@ export const tokenize = (input: string): Token[] => {
           tokens.push({ t: 'half', span: { start: span.start, end: span.start + 3 } });
           tokens.push({ t: 'num', value: lexeme.value, ordinal: true, span: { start: span.start + 3, end: span.end } });
           break;
-        case 'halfHour':
-          tokens.push({ t: 'num', value: 30, ordinal: false, span }, { t: 'unit', unit: 'minute', span });
+        case 'amount':
+          if (lexeme.every === true) tokens.push({ t: 'every', span });
+          tokens.push({ t: 'num', value: lexeme.value, ordinal: false, span }, { t: 'unit', unit: lexeme.unit, span });
           break;
         default:
           tokens.push({ ...lexeme, span });

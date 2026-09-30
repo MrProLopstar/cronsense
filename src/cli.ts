@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import { CronsenseError } from './errors.js';
 import { nextRuns } from './next.js';
 import { parse, toRRule } from './parser.js';
+import { toSystemd } from './systemd.js';
 import { parseCron } from './cron.js';
 import { describe } from './describe.js';
 import type { Schedule, Timezone, Weekday } from './types.js';
@@ -21,6 +22,7 @@ Options:
       --utc            Compute run times in UTC instead of local time
       --cron           Treat input as a cron expression
       --rrule          Print an iCalendar RRULE instead of cron
+      --systemd        Print systemd timer OnCalendar= lines instead of cron
   -e, --explain        Print a natural-language description
       --locale <ru|en> Language of the description (default en)
       --weekly-on <d>  Weekday for "weekly" (0-6, Sunday = 0; default 0)
@@ -58,6 +60,7 @@ const main = (argv: readonly string[]): number => {
       utc: { type: 'boolean', default: false },
       cron: { type: 'boolean', default: false },
       rrule: { type: 'boolean', default: false },
+      systemd: { type: 'boolean', default: false },
       explain: { type: 'boolean', short: 'e', default: false },
       locale: { type: 'string' },
       'weekly-on': { type: 'string' },
@@ -89,6 +92,10 @@ const main = (argv: readonly string[]): number => {
   if (locale !== 'ru' && locale !== 'en') throw new RangeError('--locale must be "ru" or "en"');
   const timezone: Timezone = values.utc ? 'utc' : 'local';
   const options = { strictHours: values['strict-hours'], ...(weeklyOn === undefined ? {} : { weeklyOn }) };
+  if (values.systemd) {
+    for (const line of toSystemd(input, options)) process.stdout.write(`OnCalendar=${line}\n`);
+    return 0;
+  }
   if (values.rrule) {
     process.stdout.write(`${toRRule(input, options)}
 `);

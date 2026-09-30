@@ -3,6 +3,7 @@ import { describe } from '../describe.js';
 import { CronsenseError } from '../errors.js';
 import { nextRuns } from '../next.js';
 import { parse, toRRule } from '../parser.js';
+import { toSystemd } from '../systemd.js';
 import type { Schedule, Weekday } from '../types.js';
 
 export type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
@@ -54,6 +55,20 @@ const TOOLS: Json = [
       properties: {
         text: { type: 'string', description: 'Schedule description in Russian or English' },
         weeklyOn: { type: 'integer', minimum: 0, maximum: 6, description: 'Weekday for "weekly" (0 = Sunday, default)' },
+        strictHours: { type: 'boolean', description: 'Reject hours 1-12 without morning/evening or am/pm instead of assuming morning' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'to_systemd',
+    title: 'Schedule text to systemd OnCalendar',
+    description: 'Convert a Russian or English schedule description into systemd timer OnCalendar= values, one per line.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Schedule description in Russian or English' },
         strictHours: { type: 'boolean', description: 'Reject hours 1-12 without morning/evening or am/pm instead of assuming morning' },
       },
       required: ['text'],
@@ -161,6 +176,13 @@ const callTool = (name: string, args: Args): ToolResult => {
       if (strict !== undefined && typeof strict !== 'boolean') throw new ParamsError('"strictHours" must be a boolean');
       const rrule = toRRule(text, { strictHours: strict === true, ...(weeklyOn === undefined ? {} : { weeklyOn }) });
       return success(rrule, { rrule });
+    }
+    case 'to_systemd': {
+      const text = requiredString(args, 'text');
+      const strict = args['strictHours'];
+      if (strict !== undefined && typeof strict !== 'boolean') throw new ParamsError('"strictHours" must be a boolean');
+      const lines = toSystemd(text, { strictHours: strict === true });
+      return success(lines.map((line) => `OnCalendar=${line}`).join('\n'), { onCalendar: lines });
     }
     case 'describe_cron': {
       const schedule = parseCron(requiredString(args, 'cron'));

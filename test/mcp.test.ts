@@ -62,6 +62,13 @@ describe('mcp server', () => {
     expect(call('to_rrule', { text: 'кроме пятницы' })).toMatchObject({ isError: true });
   });
 
+  it('converts text to systemd OnCalendar', () => {
+    expect(call('to_systemd', { text: 'по будням в 9:30' })).toMatchObject({
+      structuredContent: { onCalendar: ['Mon..Fri *-*-* 09:30:00'] },
+      isError: false,
+    });
+  });
+
   it('supports strictHours', () => {
     expect(call('to_cron', { text: 'без шести семь', strictHours: true })).toMatchObject({ structuredContent: { code: 'AMBIGUOUS' }, isError: true });
     expect(call('to_cron', { text: 'без шести семь вечера', strictHours: true })).toMatchObject({ structuredContent: { cron: '54 18 * * *' }, isError: false });

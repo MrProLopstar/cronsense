@@ -100,6 +100,20 @@ toRRule('по понедельникам 1 числа');              // 'FREQ=M
 
 Steps that divide the hour or the day (every 15 minutes, every 2 hours) become explicit `BYMINUTE`/`BYHOUR` lists, so they do not depend on `DTSTART`. Only true intervals (every 90 minutes, every 3 days, every 2 weeks) use `INTERVAL` and count from `DTSTART`. Tests compare the rules with [rrule.js](https://github.com/jkbrzt/rrule) occurrence by occurrence. CLI: `--rrule`; MCP: `to_rrule`.
 
+## systemd timers
+
+`toSystemd` returns values for `OnCalendar=`. systemd calendar events can do more than cron, so this output also covers the last day of the month, the Nth weekday and day-of-month AND weekday:
+
+```ts
+toSystemd('по будням в 9:30');                  // ['Mon..Fri *-*-* 09:30:00']
+toSystemd('в последний день месяца в 18:00');   // ['*-*~01 18:00:00']
+toSystemd('в первый понедельник месяца в 9:30'); // ['Mon *-*-01..07 09:30:00']
+toSystemd('ежеквартально');                     // ['*-01,04,07,10-01 00:00:00']
+toSystemd('на 23 февраля и 8 марта');           // ['*-02-23 00:00:00', '*-03-08 00:00:00'], two OnCalendar= lines
+```
+
+True intervals such as every 90 minutes are refused with a hint to use a monotonic timer (`OnUnitActiveSec=90min`). Every output is checked against `systemd-analyze calendar` in the test suite. CLI: `--systemd`; MCP: `to_systemd`.
+
 ## Dates without DTSTART
 
 `occurrences(text, { from, to })` lists the moments a schedule fires in any window, forward or backward, without a DTSTART. Only true intervals («каждые 2 недели», every 90 minutes) need an `anchor` to know which weeks count.
@@ -226,6 +240,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 | `parseCron(expression)` | Parses a 5-field cron expression or macro (`@daily`, …) into a `Schedule` |
 | `nextRuns(schedule \| expression, options?)` | Next run times; options: `count` (default 5), `from`, `timezone` (`'local'` or `'utc'`) |
 | `describe(schedule \| expression, options?)` | Natural-language description; `locale`: `'en'` (default) or `'ru'` |
+| `toSystemd(text, options?)` | systemd `OnCalendar=` values, see [systemd timers](#systemd-timers) |
 | `toRRule(text, options?)` | iCalendar RRULE string, see [RRULE](#rrule) |
 | `occurrences(text, { from, to, anchor?, timezone?, limit? })` | Moments in a window without DTSTART, including Orthodox Easter |
 | `easterDate(year, 'orthodox' \| 'western')` | Easter Sunday of a year |
@@ -253,6 +268,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 
 - Intervals: every N minutes / hours / days / months, «через день», "every other hour", «раз в 5 минут», "once a day"
 - Frequencies: hourly, daily, weekly, monthly, yearly / «ежечасно», «ежедневно», …
+- Longer periods and parity: «раз в полгода», «ежеквартально», «каждый чётный час», «по нечётным числам», «каждый третий час начиная с часа ночи»
 - Minutes of the hour: «каждый час в 15 минут», "every hour at 15 minutes past"
 - Spoken Russian time: «полвторого», «в половину третьего», «в четверть девятого вечера», «без пяти шестнадцать», «в пять минут седьмого», «в час дня», number words («в три утра», «каждые двадцать пять минут», «каждые полчаса»)
 - Times: `9:30`, `9.30`, `9am`, `7 p.m.`, noon / midnight, «в 3 часа дня», «в 11 ночи», «9 часов 45 минут», several times at once

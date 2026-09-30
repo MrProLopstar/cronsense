@@ -108,6 +108,7 @@ export const toCron = (input: string, options: ParseOptions = {}): string => par
 
 export { parse };
 export { toRRule } from './parser.js';
+export { toSystemd } from './systemd.js';
 export { occurrences, type OccurrenceOptions } from './occurrences.js';
 export { easterDate } from './easter.js';
 export { parseCron } from './cron.js';

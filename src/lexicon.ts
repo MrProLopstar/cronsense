@@ -6,7 +6,9 @@ export type Lexeme =
   | { readonly t: 'ordinal'; readonly value: number }
   | { readonly t: 'cardinal'; readonly value: number }
   | { readonly t: 'halfOf'; readonly value: number }
-  | { readonly t: 'halfHour' }
+  | { readonly t: 'amount'; readonly value: number; readonly unit: Unit; readonly every?: true }
+  | { readonly t: 'parity'; readonly odd: boolean }
+  | { readonly t: 'starting' }
   | { readonly t: 'half' }
   | { readonly t: 'quarter' }
   | { readonly t: 'without' }
@@ -67,7 +69,14 @@ const RULES: readonly Rule[] = [
 
   ...ORDINALS.map(([stem, value]): Rule => [new RegExp(`^${stem}${ORDINAL_ENDING}$`), { t: 'ordinal', value }]),
   ...CARDINALS.map(([pattern, value]): Rule => [new RegExp(`^(?:${pattern})$`), { t: 'cardinal', value }]),
-  [/^полчаса$/, { t: 'halfHour' }],
+  [/^полчаса$/, { t: 'amount', value: 30, unit: 'minute' }],
+  [/^полгода$/, { t: 'amount', value: 6, unit: 'month' }],
+  [/^(?:квартал(?:а|ов)?|quarters?)$/, { t: 'amount', value: 3, unit: 'month' }],
+  [/^(?:ежеквартальн[а-я]*|quarterly)$/, { t: 'amount', value: 3, unit: 'month', every: true }],
+  [/^(?:полугодов[а-я]*|semiannually|half-yearly)$/, { t: 'amount', value: 6, unit: 'month', every: true }],
+  [/^(?:четн(?:ый|ая|ое|ые|ого|ой|ом|ым|ых|ую|ыми)|even)$/, { t: 'parity', odd: false }],
+  [/^(?:нечетн(?:ый|ая|ое|ые|ого|ой|ом|ым|ых|ую|ыми)|odd)$/, { t: 'parity', odd: true }],
+  [/^(?:начиная|starting|beginning)$/, { t: 'starting' }],
   [/^(?:половин[аеуы]|пол)$/, { t: 'half' }],
   [/^четверт[ьи]$/, { t: 'quarter' }],
   [/^без$/, { t: 'without' }],
@@ -117,7 +126,7 @@ const RULES: readonly Rule[] = [
   [/^(?:полдень|полудня|noon|midday)$/, { t: 'clock', hour: 12 }],
   [/^(?:полночь|полуночи|midnight)$/, { t: 'clock', hour: 0 }],
 
-  [/^(?:с|со|from|between|starting)$/, { t: 'from' }],
+  [/^(?:с|со|from|between)$/, { t: 'from' }],
   [/^(?:до|to|through|thru|till|until)$/, { t: 'to', weak: false }],
   [/^по$/, { t: 'to', weak: true }],
   [/^(?:и|and|плюс)$/, { t: 'and' }],

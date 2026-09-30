@@ -89,6 +89,8 @@ class Parser {
   private readonly setPositions: number[] = [];
   private setPosGroup: 'weekday' | 'workday' | null = null;
   private workdayFilter = false;
+  private hourParity: 'even' | 'odd' | null = null;
+  private dayParity: { readonly odd: boolean; readonly span: Span } | null = null;
 
   constructor(
     private readonly input: string,
@@ -239,6 +241,16 @@ class Parser {
       case 'holiday':
         this.addHoliday(token, null);
         return;
+      case 'parity':
+        this.parity(token, token.span);
+        return;
+      case 'starting': {
+        while (this.take('from') !== null || this.take('at') !== null);
+        const start = this.item();
+        const clock = this.toClock(start);
+        this.setWindow(clock, { hour: 23, minute: 59, span: clock.span }, join(token.span, clock.span));
+        return;
+      }
       case 'unit':
         if (at && token.unit === 'hour' && token.meridiem === undefined) {
           this.index -= 1;
@@ -276,6 +288,11 @@ class Parser {
     if (token === undefined) this.fail('INCOMPLETE', `"${this.text(start)}" needs a unit, e.g. "every 5 minutes"`, start);
 
     switch (token.t) {
+      case 'parity':
+        if (step !== 1) this.unexpected(token);
+        this.advance();
+        this.parity(token, start);
+        return;
       case 'unit':
         this.advance();
         this.addInterval(token.unit, step, join(start, token.span));
@@ -684,6 +701,20 @@ class Parser {
     return true;
   }
 
+  private parity(token: TokenOf<'parity'>, start: Span): void {
+    const next = this.peek();
+    if (next?.t === 'unit' && next.unit === 'hour' && next.meridiem === undefined) {
+      this.index += 1;
+      if (this.hourParity !== null) this.fail('CONFLICT', `Even and odd hours cannot be combined`, token.span);
+      this.hourParity = token.odd ? 'odd' : 'even';
+      this.addInterval('hour', 2, join(start, next.span));
+      return;
+    }
+    if (next?.t === 'domMarker' || (next?.t === 'unit' && next.unit === 'day')) this.index += 1;
+    if (this.dayParity !== null) this.fail('CONFLICT', `Even and odd days cannot be combined`, token.span);
+    this.dayParity = { odd: token.odd, span: join(start, token.span) };
+  }
+
   private addHoliday(token: TokenOf<'holiday'>, adjective: EasterCalendar | null): void {
     const { rule } = token.holiday;
     const calendar = this.options.easter ?? adjective ?? token.holiday.calendar;
@@ -884,10 +915,11 @@ class Parser {
   }
 
   private steppedHours(step: number, window: TimeWindow | null): CronField {
-    if (window === null) return stepField('hour', step);
+    const aligned = (hour: number): number => (this.hourParity === null || hour % 2 === (this.hourParity === 'odd' ? 1 : 0) ? hour : hour + 1);
+    if (window === null) return this.hourParity === 'odd' ? stepField('hour', step, 1, 23) : stepField('hour', step);
     const from = window.from ?? { hour: 0, minute: 0, span: window.span };
     const last = window.to.minute >= from.minute ? window.to.hour : window.to.hour - 1;
-    return this.hourSpan(from.hour, (last + 24) % 24, step);
+    return this.hourSpan(aligned(from.hour) % 24, (last + 24) % 24, step);
   }
 
   private hourSpan(from: number, to: number, step: number): CronField {
@@ -918,6 +950,10 @@ class Parser {
     const { weekdays, monthDays, months } = this;
 
     let dayOfMonth: CronField = monthDays === null || monthDays.values.size === 31 ? ANY : valuesField(monthDays.values);
+    if (this.dayParity !== null) {
+      if (monthDays !== null || weekdays !== null) this.fail('CONFLICT', `Even or odd days cannot be combined with other day rules`, this.dayParity.span);
+      dayOfMonth = this.dayParity.odd ? stepField('dayOfMonth', 2) : stepField('dayOfMonth', 2, 2, 30);
+    }
     let dayOfWeek: CronField = weekdays === null || weekdays.values.size === 7 ? ANY : valuesField(weekdays.values);
     let month: CronField = months === null || months.values.size === 12 ? ANY : valuesField(months.values);
 
@@ -1024,6 +1060,9 @@ class Parser {
       }
     }
 
+    if (nth.length > 0 && (monthDays !== null || this.lastDay || this.holidayDates.length > 0)) {
+      this.fail('CONFLICT', `An Nth weekday cannot be combined with days of the month`, monthDays?.span ?? null);
+    }
     if (nth.length > 0 && weekdays !== null) {
       this.fail('CONFLICT', `Every-week days and Nth weekdays cannot be mixed in one rule; split them into two`, weekdays.span);
     }
@@ -1035,7 +1074,17 @@ class Parser {
     }
 
     const byMonth = months === null || months.values.size === 12 ? [] : [...months.values].sort((a, b) => a - b);
-    const byMonthDay = [...(monthDays?.values ?? [])].sort((a, b) => a - b);
+    if (freq === 'MONTHLY' && coarse === 'month' && step > 1 && 12 % step === 0 && byMonth.length === 0) {
+      for (let month = 1; month <= 12; month += step) byMonth.push(month);
+      freq = 'YEARLY';
+      step = 1;
+    }
+    if (this.dayParity !== null && (monthDays !== null || weekdays !== null || nth.length > 0)) {
+      this.fail('CONFLICT', `Even or odd days cannot be combined with other day rules`, this.dayParity.span);
+    }
+    const byMonthDay = this.dayParity === null
+      ? [...(monthDays?.values ?? [])].sort((a, b) => a - b)
+      : Array.from({ length: 16 }, (_, index) => index * 2 + (this.dayParity?.odd === true ? 1 : 2)).filter((day) => day <= 31);
     if (this.lastDay) byMonthDay.push(-1);
     const byDay: { readonly nth: number | null; readonly day: Weekday }[] = [
       ...[...(weekdays?.values ?? [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((day) => ({ nth: null, day })),

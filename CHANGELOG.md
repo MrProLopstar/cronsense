@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.7.0
+
+- `toSystemd`: systemd timer `OnCalendar=` values, including the last day of the month, Nth weekdays and day-of-month AND weekday; checked against `systemd-analyze calendar`. CLI `--systemd`, MCP tool `to_systemd`
+- «раз в полгода», «каждые полгода», «ежеквартально», «каждый квартал», "quarterly"
+- Parity: «каждый чётный час», «каждый нечётный час», «по чётным числам», «по нечётным дням», "every odd hour"; windows keep the parity («каждый чётный час с 9 до 18» starts at 10)
+- «начиная с …» / "starting at …" opens a window until the end of the day: «каждый третий час начиная с часа ночи» → `0 1-23/3 * * *`
+- `toRRule` writes month steps that divide the year as `BYMONTH` lists, so «каждые 3 месяца» no longer depends on DTSTART
+- Fix: an Nth weekday together with a day of the month («в последнюю пятницу 1 числа») is rejected instead of producing a rule that never fires
+
 ## 1.6.0
 
 - Named holidays: Russian public holidays, Orthodox and Western church holidays, fixed and Easter-based, with the calendar picked by language or by «католическое» / «православное» / the `easter` option
