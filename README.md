@@ -129,7 +129,7 @@ Options: `timezone` (`'local'` by default or `'utc'`), `limit` (10 000 by defaul
 `occurrences` understands the Russian production calendar when you pass a working-day predicate, for example from [prodcal](https://jsr.io/@mrprolopstar/prodcal). cronsense itself stays dependency-free, so any country's calendar works.
 
 ```ts
-import { isWorkday } from 'prodcal';
+import { isWorkday } from 'prodcalendar';
 
 occurrences('в первый рабочий день месяца в 9:00', { from, to, isWorkday });  // 2026-01-12, 2026-02-02, ...
 occurrences('в последний рабочий день месяца в 18:00', { from, to, isWorkday }); // 2026-12-30, not the 31st

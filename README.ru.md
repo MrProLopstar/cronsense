@@ -129,7 +129,7 @@ occurrences('каждые 2 недели по понедельникам в 19:0
 `occurrences` учитывает производственный календарь, если передать функцию проверки рабочего дня, например из [prodcal](https://jsr.io/@mrprolopstar/prodcal). Сам cronsense остаётся без зависимостей, поэтому подойдёт календарь любой страны.
 
 ```ts
-import { isWorkday } from 'prodcal';
+import { isWorkday } from 'prodcalendar';
 
 occurrences('в первый рабочий день месяца в 9:00', { from, to, isWorkday });  // 2026-01-12, 2026-02-02, ...
 occurrences('в последний рабочий день месяца в 18:00', { from, to, isWorkday }); // 2026-12-30, а не 31-е
