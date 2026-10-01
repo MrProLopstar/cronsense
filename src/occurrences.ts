@@ -10,7 +10,7 @@ export interface OccurrenceOptions extends ParseOptions {
   readonly anchor?: Date;
   readonly timezone?: Timezone;
   readonly limit?: number;
-  /** Working-day predicate for «рабочий день», for example `isWorkday` from `@mrprolopstar/prodcal`. Receives `YYYY-MM-DD`. */
+  /** Working-day predicate for «рабочий день», for example `isWorkday` from `prodcalendar`. Receives `YYYY-MM-DD`. */
   readonly isWorkday?: (date: string) => boolean;
 }
 
@@ -64,7 +64,7 @@ export const occurrences = (input: string, options: OccurrenceOptions): Date[] =
 
   const { isWorkday } = options;
   if (plan.setPosGroup === 'workday' && isWorkday === undefined) {
-    throw new CronsenseError('INCOMPLETE', `"${input}" needs a working-day calendar; pass isWorkday, for example from @mrprolopstar/prodcal`, input);
+    throw new CronsenseError('INCOMPLETE', `"${input}" needs a working-day calendar; pass isWorkday, for example from prodcalendar`, input);
   }
   const clock = options.timezone === 'utc' ? UTC : LOCAL;
   const positionCache = new Map<number, ReadonlySet<number>>();

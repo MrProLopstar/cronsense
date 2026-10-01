@@ -126,7 +126,7 @@ Options: `timezone` (`'local'` by default or `'utc'`), `limit` (10 000 by defaul
 
 ## Working days
 
-`occurrences` understands the Russian production calendar when you pass a working-day predicate, for example from [prodcal](https://jsr.io/@mrprolopstar/prodcal). cronsense itself stays dependency-free, so any country's calendar works.
+`occurrences` understands the Russian production calendar when you pass a working-day predicate, for example from [prodcalendar](https://jsr.io/@mrprolopstar/prodcalendar). cronsense itself stays dependency-free, so any country's calendar works.
 
 ```ts
 import { isWorkday } from 'prodcalendar';
