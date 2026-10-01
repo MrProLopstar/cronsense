@@ -40,12 +40,10 @@ jobs:
           version="${TAG#v}"
           test "$(node -p "require('./package.json').version")" = "$version"
           test "$(node -p "require('./jsr.json').version")" = "$version"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
       - name: Publish to npm
         run: |
+          rm -f ~/.npmrc .npmrc
+          unset NODE_AUTH_TOKEN
           npm install -g npm@latest
           npm run build
           if npm view "cronsense@${TAG#v}" version > /dev/null 2>&1; then
