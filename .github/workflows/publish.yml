@@ -24,7 +24,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -34,10 +34,23 @@ jobs:
           version="${TAG#v}"
           test "$(node -p "require('./package.json').version")" = "$version"
           test "$(node -p "require('./jsr.json').version")" = "$version"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Publish to npm
+        run: |
+          npm install -g npm@latest
+          npm run build
+          if npm view "cronsense@${TAG#v}" version > /dev/null 2>&1; then
+            echo "Already on npm"
+          else
+            npm publish --access public --provenance --ignore-scripts
+          fi
       - run: npx jsr publish
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: '@mrprolopstar'
       - name: Publish to GitHub Packages
