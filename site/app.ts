@@ -1,5 +1,5 @@
 import { formatField, FIELD_ORDER } from '../src/field.js';
-import { isWorkday, lastYear, ProdcalError } from '@mrprolopstar/prodcal';
+import { isWorkday, lastYear, ProdcalError } from 'prodcalendar';
 import { CronsenseError, describe, nextRuns, occurrences, parse, parseCron, toRRule, toSystemd, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
 
 type Mode = 'text' | 'cron' | 'dates';

@@ -8,6 +8,12 @@ on:
       tag:
         type: string
         required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish, e.g. v1.2.0
+        type: string
+        required: true
 
 jobs:
   publish:

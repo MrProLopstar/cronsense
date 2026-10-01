@@ -1,4 +1,4 @@
-import { isWorkday } from '@mrprolopstar/prodcal';
+import { isWorkday } from 'prodcalendar';
 import { RRule } from 'rrule';
 import { describe, expect, it } from 'vitest';
 import { occurrences, safeParse, toCron, toRRule, type ErrorCode } from '../src/index.js';

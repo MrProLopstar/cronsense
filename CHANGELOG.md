@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.7.1
+
+- Published to npm as `cronsense`, the main source of the package; JSR and GitHub Packages stay as mirrors
+- Releases publish to npm from GitHub Actions with trusted publishing and provenance
+- Working-day examples and hints point to `prodcalendar` on npm
+
 ## 1.7.0
 
 - `toSystemd`: systemd timer `OnCalendar=` values, including the last day of the month, Nth weekdays and day-of-month AND weekday; checked against `systemd-analyze calendar`. CLI `--systemd`, MCP tool `to_systemd`

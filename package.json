@@ -1,6 +1,6 @@
 {
   "name": "cronsense",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Turn plain Russian or English schedules into cron expressions: «по будням в 9:30» → 30 9 * * 1-5",
   "keywords": [
     "cron",
@@ -48,8 +48,8 @@
     "build:site": "tsc -p site/tsconfig.json && node scripts/copy-site.mjs"
   },
   "devDependencies": {
-    "@mrprolopstar/prodcal": "npm:@jsr/mrprolopstar__prodcal@^0.1.0",
     "@types/node": "^22.10.0",
+    "prodcalendar": "^0.1.2",
     "rrule": "^2.8.1",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
@@ -80,13 +81,7 @@ jobs:
           fi
           git tag "v$VERSION"
           git push origin "v$VERSION"
-
-  publish:
-    needs: tag
-    uses: ./.github/workflows/publish.yml
-    with:
-      tag: ${{ needs.tag.outputs.tag }}
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
+      - name: Start publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish.yml --ref main -f tag="${{ steps.version.outputs.tag }}"
