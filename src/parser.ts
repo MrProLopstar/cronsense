@@ -252,7 +252,7 @@ class Parser {
         return;
       }
       case 'unit':
-        if (at && token.unit === 'hour' && token.meridiem === undefined) {
+        if ((at || this.meridiemAhead() || this.spokenMinutes() !== null) && token.unit === 'hour' && token.meridiem === undefined) {
           this.index -= 1;
           this.valueList(at);
           return;
@@ -400,6 +400,19 @@ class Parser {
     return { k: 'clock', clock: this.makeClock(hour, minute, span, suffix?.meridiem ?? null) };
   }
 
+  private meridiemAhead(): boolean {
+    const next = this.peek();
+    return next?.t === 'meridiem' || (next?.t === 'unit' && next.meridiem !== undefined);
+  }
+
+  private spokenMinutes(): Extract<Token, { t: 'num' }> | null {
+    const minutes = this.peek();
+    if (minutes?.t !== 'num' || minutes.ordinal || minutes.value > 59 || !/[а-яё]/i.test(this.text(minutes.span))) return null;
+    const after = this.peek(1);
+    if (after?.t === 'domMarker' || after?.t === 'month' || (after?.t === 'unit' && after.meridiem === undefined)) return null;
+    return minutes;
+  }
+
   private beforeHour(start: Span): Item {
     let minutes: number;
     const amount = this.advance();
@@ -434,7 +447,9 @@ class Parser {
     switch (token.t) {
       case 'unit': {
         if (token.unit !== 'hour' || token.meridiem !== undefined) this.unexpected(token);
-        return this.spokenClock(1, 0, token.span, token.span);
+        const minutes = this.spokenMinutes();
+        if (minutes !== null) this.index += 1;
+        return this.spokenClock(1, minutes?.value ?? 0, token.span, minutes?.span ?? token.span);
       }
       case 'half': {
         this.take('dash');
@@ -456,6 +471,11 @@ class Parser {
       }
       case 'num': {
         if (token.ordinal) return { k: 'num', value: token.value, ordinal: true, span: token.span };
+        const spoken = token.value <= 23 ? this.spokenMinutes() : null;
+        if (spoken !== null) {
+          this.index += 1;
+          return this.spokenClock(token.value, spoken.value, token.span, spoken.span);
+        }
         let span = token.span;
         let minute = 0;
         let explicit = false;

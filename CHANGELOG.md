@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.7.2
+
+- «час ночи» and «час дня» work without «в»
+- Hours and minutes said as two numbers: «в час тридцать», «в семь сорок пять утра», «в час пятнадцать дня»
+
 ## 1.7.1
 
 - Published to npm as `cronsense`, the main source of the package; JSR and GitHub Packages stay as mirrors

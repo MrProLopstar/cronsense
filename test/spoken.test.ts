@@ -206,3 +206,27 @@ describe('strictHours', () => {
     expect(toCron(text, { strictHours: true })).toBe(cron);
   });
 });
+
+describe('hours and minutes said as two numbers', () => {
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ['час ночи', '0 1 * * *'],
+    ['час дня', '0 13 * * *'],
+    ['по будням час ночи', '0 1 * * 1-5'],
+    ['в час тридцать', '30 1 * * *'],
+    ['в час пятнадцать дня', '15 13 * * *'],
+    ['в два тридцать ночи', '30 2 * * *'],
+    ['в семь сорок пять утра', '45 7 * * *'],
+    ['в семь сорок пять вечера', '45 19 * * *'],
+    ['по будням в девять тридцать', '30 9 * * 1-5'],
+    ['в 7 сорок', '40 7 * * *'],
+    ['в три пятнадцать числа', '0 3 15 * *'],
+    ['каждые два часа', '0 */2 * * *'],
+  ];
+  it.each(cases)('%s → %s', (text, cron) => {
+    expect(toCron(text)).toBe(cron);
+  });
+
+  it('keeps digit pairs ambiguous', () => {
+    expect(() => toCron('в 2 30')).toThrow(expect.objectContaining({ code: 'AMBIGUOUS' }));
+  });
+});
