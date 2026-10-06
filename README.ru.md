@@ -35,6 +35,17 @@ mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
 npm install cronsense
 ```
 
+Без сборщика пакет можно подключить в браузере прямо с jsDelivr: он сам собирает минифицированный ES-модуль из npm-пакета:
+
+```html
+<script type="module">
+  import { toCron } from 'https://cdn.jsdelivr.net/npm/cronsense@1/+esm';
+  console.log(toCron('по будням в 9:30'));
+</script>
+```
+
+`@1` берёт последний релиз 1.x; в продакшене лучше указать точную версию, например `@1.7.1`.
+
 Тот же пакет опубликован в [JSR](https://jsr.io/@mrprolopstar/cronsense) для Deno и Bun:
 
 ```bash

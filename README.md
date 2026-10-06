@@ -35,6 +35,17 @@ mon, wed and fri at 6pm                   →  0 18 * * 1,3,5
 npm install cronsense
 ```
 
+No bundler? Load it in the browser straight from jsDelivr, which builds a minified ES module from the npm package:
+
+```html
+<script type="module">
+  import { toCron } from 'https://cdn.jsdelivr.net/npm/cronsense@1/+esm';
+  console.log(toCron('по будням в 9:30'));
+</script>
+```
+
+`@1` follows the latest 1.x release; pin an exact version such as `@1.7.1` in production.
+
 The same package is published to [JSR](https://jsr.io/@mrprolopstar/cronsense) for Deno and Bun:
 
 ```bash
