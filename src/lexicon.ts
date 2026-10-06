@@ -2,6 +2,7 @@ import type { EasterCalendar, Meridiem, Unit, Weekday } from './types.js';
 
 export type Lexeme =
   | { readonly t: 'every' }
+  | { readonly t: 'times' }
   | { readonly t: 'other' }
   | { readonly t: 'ordinal'; readonly value: number }
   | { readonly t: 'cardinal'; readonly value: number }
@@ -62,6 +63,7 @@ const freq = (value: Unit): Lexeme => ({ t: 'freq', unit: value });
 const RULES: readonly Rule[] = [
   [/^(?:кажд(?:ый|ая|ое|ые|ую|ого|ой|ом|ым|ых)|every|each|раз|once)$/, { t: 'every' }],
   [/^(?:other|через)$/, { t: 'other' }],
+  [/^(?:раза|times)$/, { t: 'times' }],
 
   [/^(?:перв(?:ый|ое|ого|ая|ую|ой|ым|ом)|first)$/, { t: 'ordinal', value: 1 }],
   [/^(?:втор(?:ой|ое|ого|ая|ую|ым|ом)|second)$/, { t: 'ordinal', value: 2 }],
@@ -70,7 +72,7 @@ const RULES: readonly Rule[] = [
   ...ORDINALS.map(([stem, value]): Rule => [new RegExp(`^${stem}${ORDINAL_ENDING}$`), { t: 'ordinal', value }]),
   ...CARDINALS.map(([pattern, value]): Rule => [new RegExp(`^(?:${pattern})$`), { t: 'cardinal', value }]),
   [/^полчаса$/, { t: 'amount', value: 30, unit: 'minute' }],
-  [/^полгода$/, { t: 'amount', value: 6, unit: 'month' }],
+  [/^(?:полгода|полугоди[еяю])$/, { t: 'amount', value: 6, unit: 'month' }],
   [/^(?:квартал(?:а|ов)?|quarters?)$/, { t: 'amount', value: 3, unit: 'month' }],
   [/^(?:ежеквартальн[а-я]*|quarterly)$/, { t: 'amount', value: 3, unit: 'month', every: true }],
   [/^(?:полугодов[а-я]*|semiannually|half-yearly)$/, { t: 'amount', value: 6, unit: 'month', every: true }],
@@ -86,7 +88,7 @@ const RULES: readonly Rule[] = [
   [/^(?:час(?:а|ов)?|hours?|hrs?)$/, unit('hour')],
   [/^(?:день|дней|сутки|суток|days?)$/, unit('day')],
   [/^(?:недел(?:я|и|ю|ь)|weeks?)$/, unit('week')],
-  [/^(?:месяц(?:а|ев)?|months?)$/, unit('month')],
+  [/^(?:месяц(?:а|ев|ам|ах)?|months?)$/, unit('month')],
   [/^(?:год(?:а)?|лет|years?)$/, unit('year')],
 
   [/^(?:ежеминутн[а-я]*)$/, freq('minute')],
@@ -142,6 +144,7 @@ const RULES: readonly Rule[] = [
   [/^(?:католическ[а-я]*|западн[а-я]*|western|catholic)$/, { t: 'easterKind', calendar: 'western' }],
   [/^(?:после|after)$/, { t: 'after' }],
   [/^before$/, { t: 'before' }],
+  [/^(?:сегодня|завтра|послезавтра|today|tomorrow)$/, { t: 'unsupported', feature: 'one-time dates; use when()' }],
   [/^(?:секунд[а-я]*|seconds?|secs?)$/, { t: 'unsupported', feature: 'second-level precision' }],
   [/^(?:кроме|except|excluding)$/, { t: 'unsupported', feature: 'exclusions' }],
   [/^(?:десятилет[а-я]*|век[аеу]?|веков|столет[а-я]*|decades?|centur(?:y|ies))$/, { t: 'unsupported', feature: 'intervals longer than a year' }],

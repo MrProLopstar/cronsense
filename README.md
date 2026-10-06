@@ -135,6 +135,21 @@ occurrences('каждые 2 недели по понедельникам в 19:0
 
 Options: `timezone` (`'local'` by default or `'utc'`), `limit` (10 000 by default), plus all parse options. The results are checked against rrule.js on tens of thousands of random phrases.
 
+## One-time moments
+
+Cron describes repeating schedules, but reminders often need a single moment. `when(text, { now })` resolves it:
+
+```ts
+when('через 4 часа');                              // now + 4 hours
+when('завтра в двенадцать семнадцать');             // tomorrow at 12:17
+when('через месяц ровно, в 12:17');                 // same day next month at 12:17
+when('по пятницам в 19:00');                        // a recurring phrase resolves to its next run
+```
+
+It understands «сегодня», «завтра», «послезавтра», today, tomorrow, «через N минут/часов/дней/недель/месяцев/лет» (also «полчаса», «полтора часа», «2 часа 30 минут») and «in N days», with an optional time. Month arithmetic keeps the day of the month and clamps it, so «через месяц» from January 31 is February 28. Options: `now` (the current time by default), `timezone`, plus all parse options.
+
+In `toCron` «через день» and «через месяц» still mean every other day or month, while «через 4 часа» and «завтра» point you to `when()`.
+
 ## Working days
 
 `occurrences` understands the Russian production calendar when you pass a working-day predicate, for example from [prodcalendar](https://jsr.io/@mrprolopstar/prodcalendar). cronsense itself stays dependency-free, so any country's calendar works.
@@ -251,6 +266,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 | `toSystemd(text, options?)` | systemd `OnCalendar=` values, see [systemd timers](#systemd-timers) |
 | `toRRule(text, options?)` | iCalendar RRULE string, see [RRULE](#rrule) |
 | `occurrences(text, { from, to, anchor?, timezone?, limit? })` | Moments in a window without DTSTART, including Orthodox Easter |
+| `when(text, { now?, timezone? })` | One moment: «через 4 часа», «завтра в 12:17», or the next run of a schedule |
 | `easterDate(year, 'orthodox' \| 'western')` | Easter Sunday of a year |
 | `formatCron(fields)` | Formats structured fields back into a cron string |
 
@@ -276,7 +292,9 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 
 - Intervals: every N minutes / hours / days / months, «через день», "every other hour", «раз в 5 минут», "once a day"
 - Frequencies: hourly, daily, weekly, monthly, yearly / «ежечасно», «ежедневно», …
-- Longer periods and parity: «раз в полгода», «ежеквартально», «каждый чётный час», «по нечётным числам», «каждый третий час начиная с часа ночи»
+- Longer periods and parity: «раз в полгода», «раз в полугодие», «ежеквартально», «каждый чётный час», «по нечётным числам», «каждый чётный месяц», «каждый третий час начиная с часа ночи»; «каждый чётный четверг» is the 2nd and 4th Thursday (RRULE)
+- Counted frequencies checked against the list: «три раза в месяц, 8, 10 и 12 числа», «два раза в неделю по вторникам и пятницам»
+- Hours and minutes as two numbers: «в час тридцать», «в семь сорок пять утра», «в одну минуту пополудни»
 - Minutes of the hour: «каждый час в 15 минут», "every hour at 15 minutes past"
 - Spoken Russian time: «полвторого», «в половину третьего», «в четверть девятого вечера», «без пяти шестнадцать», «в пять минут седьмого», «в час дня», number words («в три утра», «каждые двадцать пять минут», «каждые полчаса»)
 - Times: `9:30`, `9.30`, `9am`, `7 p.m.`, noon / midnight, «в 3 часа дня», «в 11 ночи», «9 часов 45 минут», several times at once

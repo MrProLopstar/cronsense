@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.8.0
+
+- `when()` resolves one-time phrases: «через 4 часа», «завтра в 12:17», «через месяц ровно, в двенадцать семнадцать»; a recurring phrase resolves to its next run
+- `toCron` points «через 4 часа», «сегодня» and «завтра» to `when()` instead of failing on an unknown word
+- «три раза в месяц, 8, 10 и 12 числа»: counted frequencies, checked against the listed days
+- Even and odd months («каждый чётный месяц»); «каждый чётный четверг» as the 2nd and 4th Thursday in RRULE
+- «раз в полугодие», «по чётным месяцам», «в одну минуту пополудни» (12:01)
+- Idioms that never happen («когда рак на горе свистнет», «после дождичка в четверг») get an honest error
+
 ## 1.7.2
 
 - «час ночи» and «час дня» work without «в»

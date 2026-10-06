@@ -91,6 +91,7 @@ class Parser {
   private workdayFilter = false;
   private hourParity: 'even' | 'odd' | null = null;
   private dayParity: { readonly odd: boolean; readonly span: Span } | null = null;
+  private count: { readonly times: number; readonly unit: Unit; readonly span: Span } | null = null;
 
   constructor(
     private readonly input: string,
@@ -118,6 +119,36 @@ class Parser {
   private consume(): void {
     if (this.tokens.length === 0) this.fail('EMPTY_INPUT', 'Schedule description is empty', null);
     while (this.peek() !== undefined) this.clause();
+    if (this.count !== null) this.checkCount(this.count);
+  }
+
+  private counted(amount: TokenOf<'num'>): void {
+    const times = this.advance();
+    this.take('at');
+    const unit = this.advance();
+    if (unit.t !== 'unit' || unit.unit === 'minute') this.unexpected(unit);
+    if (this.count !== null) this.fail('CONFLICT', `Only one «N times per» phrase is allowed`, amount.span);
+    this.count = { times: amount.value, unit: unit.unit, span: join(amount.span, join(times.span, unit.span)) };
+    this.addInterval(unit.unit, 1, this.count.span);
+  }
+
+  private checkCount({ times, unit, span }: { readonly times: number; readonly unit: Unit; readonly span: Span }): void {
+    const listed =
+      unit === 'month' ? (this.monthDays?.values.size ?? 0) + this.nthWeekdays.length + this.setPositions.length
+      : unit === 'week' ? (this.weekdays?.values.size ?? 0)
+      : unit === 'day' ? this.times.length
+      : unit === 'hour' ? this.minuteMarks.length
+      : (this.months?.values.size ?? 0) + this.holidayDates.length;
+    const [which, example] = ({
+      month: ['days of the month', '«8, 10 и 12 числа»'],
+      week: ['weekdays', '«по вторникам и пятницам»'],
+      day: ['times of day', '«в 9 и 21»'],
+      hour: ['minutes', '«в 0 и 30 минут»'],
+      year: ['months or dates', '«в марте и сентябре»'],
+      minute: ['seconds', ''],
+    } as const)[unit];
+    if (listed === 0) this.fail('UNSUPPORTED', `"${this.text(span)}" needs the exact ${which}, for example ${example}; cron cannot pick them by itself`, span);
+    if (listed !== times) this.fail('CONFLICT', `"${this.text(span)}" says ${times}, but ${listed} ${which} are listed`, span);
   }
 
   private rruleOnly(feature: string, span: Span): void {
@@ -203,9 +234,15 @@ class Parser {
       case 'every':
         this.every(1, token.span);
         return;
-      case 'other':
+      case 'other': {
+        const next = this.peek();
+        if (next?.t === 'num' && !next.ordinal && this.text(token.span).toLowerCase() === 'через') {
+          const span = join(token.span, this.peek(1)?.span ?? next.span);
+          this.fail('UNSUPPORTED', `"${this.text(span)}" is a one-time moment, not a schedule; use when()`, span);
+        }
         this.every(2, token.span);
         return;
+      }
       case 'freq':
         this.addInterval(token.unit, 1, token.span);
         return;
@@ -227,6 +264,13 @@ class Parser {
         this.monthPhrase(token, true);
         return;
       case 'num':
+        if (this.kindAt(0) === 'times') {
+          this.counted(token);
+          return;
+        }
+        this.index -= 1;
+        this.valueList(at);
+        return;
       case 'time':
       case 'clock':
       case 'half':
@@ -266,6 +310,7 @@ class Parser {
         return;
       }
       case 'meridiem':
+      case 'times':
       case 'domMarker':
       case 'dash':
       case 'easter':
@@ -488,6 +533,12 @@ class Parser {
           if (hourWord?.t === 'num' && hourWord.ordinal && this.kindAt(1) !== 'domMarker') {
             const { hour, span: end } = this.hourOf(hourWord, this.text(span));
             return this.spokenClock(hour, token.value, token.span, end);
+          }
+          const noon = this.peek();
+          const word = noon?.t === 'meridiem' ? this.text(noon.span).toLowerCase() : '';
+          if (noon !== undefined && (word === 'пополудни' || word === 'пополуночи')) {
+            this.index += 1;
+            return { k: 'clock', clock: { hour: word === 'пополудни' ? 12 : 0, minute: token.value, span: join(span, noon.span) } };
           }
           return { k: 'mark', minute: token.value, span };
         }
@@ -728,6 +779,17 @@ class Parser {
       if (this.hourParity !== null) this.fail('CONFLICT', `Even and odd hours cannot be combined`, token.span);
       this.hourParity = token.odd ? 'odd' : 'even';
       this.addInterval('hour', 2, join(start, next.span));
+      return;
+    }
+    if (next?.t === 'unit' && next.unit === 'month') {
+      this.index += 1;
+      const months = Array.from({ length: 6 }, (_, index) => index * 2 + (token.odd ? 1 : 2));
+      this.months = this.track(this.months, months, join(start, next.span));
+      this.addInterval('month', 1, join(start, next.span));
+      return;
+    }
+    if (next?.t === 'dow' && next.group === undefined) {
+      this.nthWeekday(token.odd ? [1, 3, 5] : [2, 4], next);
       return;
     }
     if (next?.t === 'domMarker' || (next?.t === 'unit' && next.unit === 'day')) this.index += 1;

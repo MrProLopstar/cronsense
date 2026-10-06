@@ -110,6 +110,7 @@ export { parse };
 export { toRRule } from './parser.js';
 export { toSystemd } from './systemd.js';
 export { occurrences, type OccurrenceOptions } from './occurrences.js';
+export { when, type WhenOptions } from './when.js';
 export { easterDate } from './easter.js';
 export { parseCron } from './cron.js';
 export { describe, type DescribeOptions, type Locale } from './describe.js';

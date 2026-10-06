@@ -36,8 +36,14 @@ const matchAt = (pattern: RegExp, text: string, index: number): RegExpExecArray 
   return pattern.exec(text);
 };
 
+const NEVER = /(?:(?:когда )?рак\S* на горе свистн\S*|после дождичка в четверг|на морском дне|на греческие календы|никогда|when pigs fly|once in a blue moon)/;
+
 export const tokenize = (input: string): Token[] => {
   const text = normalize(input);
+  const never = NEVER.exec(text);
+  if (never !== null) {
+    throw new CronsenseError('UNSUPPORTED', `"${input.slice(never.index, never.index + never[0].length)}" never happens, so there is nothing to schedule`, input, { start: never.index, end: never.index + never[0].length });
+  }
   const tokens: Token[] = [];
   let index = 0;
   let wordTens: Token | null = null;
