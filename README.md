@@ -327,7 +327,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 
 cronsense follows [semver](https://semver.org). The public API (`parse`, `safeParse`, `toCron`, `describe`, `parseCron`, `nextRuns`, `formatCron`, exported types and error codes) only changes in a major release. New vocabulary and new locales can make previously rejected phrases parse; that is not a breaking change. See [CHANGELOG.md](CHANGELOG.md).
 
-To release, run **Actions → Release → Run workflow** and pick `patch`, `minor`, `major` or an exact version.
+To release, run **Actions → Publish → Run workflow** and pick `patch`, `minor`, `major` or an exact version.
 
 ## License
 

@@ -327,7 +327,7 @@ Claude Desktop, Cursor и другие клиенты (конфиг `mcpServers`
 
 cronsense следует [semver](https://semver.org). Публичный API (`parse`, `safeParse`, `toCron`, `describe`, `parseCron`, `nextRuns`, `formatCron`, экспортируемые типы и коды ошибок) меняется только в мажорных релизах. Новые слова и языки могут начать принимать фразы, которые раньше отклонялись; это не считается ломающим изменением. История изменений в [CHANGELOG.md](CHANGELOG.md).
 
-Релиз делается через **Actions → Release → Run workflow**: выбрать `patch`, `minor`, `major` или точную версию.
+Релиз делается через **Actions → Publish → Run workflow**: выбрать `patch`, `minor`, `major` или точную версию.
 
 ## Лицензия
 
