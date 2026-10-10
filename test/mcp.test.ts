@@ -30,6 +30,7 @@ describe('mcp server', () => {
     expect(JSON.stringify(result)).toContain('"to_cron"');
     expect(JSON.stringify(result)).toContain('"describe_cron"');
     expect(JSON.stringify(result)).toContain('"next_runs"');
+    expect(JSON.stringify(result)).toContain('"when"');
   });
 
   it('converts text to cron', () => {
@@ -52,6 +53,15 @@ describe('mcp server', () => {
       structuredContent: { runs: ['2026-09-24T09:30:00.000Z', '2026-09-25T09:30:00.000Z'] },
       isError: false,
     });
+  });
+
+  it('resolves one-time moments', () => {
+    expect(call('when', { text: 'завтра в 12:17', now: '2026-10-05T10:05:00Z' })).toMatchObject({
+      structuredContent: { moment: '2026-10-06T12:17:00.000Z' },
+      isError: false,
+    });
+    expect(call('when', { text: 'через 4 часа', now: '2026-10-05T10:05:00Z' })).toMatchObject({ structuredContent: { moment: '2026-10-05T14:05:00.000Z' } });
+    expect(call('when', { text: 'завтра', now: '2026-10-05T10:05:00Z' })).toMatchObject({ isError: true, structuredContent: { code: 'INCOMPLETE' } });
   });
 
   it('converts text to RRULE', () => {
@@ -88,6 +98,7 @@ describe('mcp server', () => {
     ['describe_cron', { cron: '* * * * *', locale: 'de' }],
     ['next_runs', { cron: '* * * * *', count: 0 }],
     ['next_runs', { cron: '* * * * *', from: 'yesterday' }],
+    ['when', { text: 'через час', now: 'yesterday' }],
     ['missing_tool', {}],
   ] as const)('rejects invalid params for %s %j', (name, args) => {
     expect(request(1, 'tools/call', { name, arguments: args })).toMatchObject({ error: { code: -32602 } });

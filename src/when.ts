@@ -7,6 +7,8 @@ export interface WhenOptions extends ParseOptions {
   /** Moment the phrase is relative to. Defaults to the current time. */
   readonly now?: Date;
   readonly timezone?: Timezone;
+  /** Working-day predicate for recurring phrases with «рабочий день», for example `isWorkday` from `prodcalendar`. */
+  readonly isWorkday?: (date: string) => boolean;
 }
 
 const DAYS: Readonly<Record<string, number>> = { сегодня: 0, today: 0, завтра: 1, tomorrow: 1, послезавтра: 2 };

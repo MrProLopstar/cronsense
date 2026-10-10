@@ -5,6 +5,7 @@ import { nextRuns } from '../next.js';
 import { parse, toRRule } from '../parser.js';
 import { toSystemd } from '../systemd.js';
 import type { Schedule, Weekday } from '../types.js';
+import { when } from '../when.js';
 
 export type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
 
@@ -106,6 +107,22 @@ const TOOLS: Json = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'when',
+    title: 'One-time moment',
+    description:
+      'Resolve a one-time Russian or English phrase such as "через 4 часа", "завтра в 12:17" or "in 3 days at 5pm" to an ISO 8601 timestamp. A recurring phrase resolves to its next run. Use it for reminders instead of computing dates by hand.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Phrase in Russian or English' },
+        now: { type: 'string', description: 'ISO 8601 moment the phrase is relative to (default now)' },
+        timezone: { type: 'string', enum: ['utc', 'local'], description: 'Time zone for calendar arithmetic and times of day (default utc)' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 class ParamsError extends Error {}
@@ -201,6 +218,16 @@ const callTool = (name: string, args: Args): ToolResult => {
       const runs = nextRuns(schedule, { count, from, timezone }).map((run) => run.toISOString());
       return success(runs.join('\n'), { cron: schedule.cron, runs });
     }
+    case 'when': {
+      const text = requiredString(args, 'text');
+      const timezone = optionalEnum(args, 'timezone', ['utc', 'local'] as const) ?? 'utc';
+      const nowRaw = args['now'];
+      if (nowRaw !== undefined && typeof nowRaw !== 'string') throw new ParamsError('"now" must be an ISO 8601 string');
+      const now = nowRaw === undefined ? new Date() : new Date(nowRaw);
+      if (Number.isNaN(now.getTime())) throw new ParamsError('"now" is not a valid date');
+      const moment = when(text, { now, timezone }).toISOString();
+      return success(moment, { moment });
+    }
     default:
       throw new ParamsError(`Unknown tool "${name}"`);
   }
@@ -240,7 +267,7 @@ export const handleMessage = (message: unknown, info: ServerInfo): Response | nu
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: info.name, version: info.version },
         instructions:
-          'Use to_cron to turn schedule descriptions into cron, describe_cron to explain cron expressions, next_runs to preview run times. Never guess cron by hand when these tools are available.',
+          'Use to_cron to turn schedule descriptions into cron, describe_cron to explain cron expressions, next_runs to preview run times, when to resolve one-time phrases like «через 4 часа». Never guess cron by hand when these tools are available.',
       });
     }
     case 'ping':

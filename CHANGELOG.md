@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.9.0
+
+- MCP tool `when` for one-time moments, so agents stop computing reminder dates by hand
+- Playground mode «Разовый момент» for `when()`
+- `when()` accepts `isWorkday` for recurring phrases with working days
+
 ## 1.8.0
 
 - `when()` resolves one-time phrases: «через 4 часа», «завтра в 12:17», «через месяц ровно, в двенадцать семнадцать»; a recurring phrase resolves to its next run

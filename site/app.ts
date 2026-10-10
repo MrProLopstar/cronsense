@@ -1,14 +1,16 @@
 import { formatField, FIELD_ORDER } from '../src/field.js';
 import { isWorkday, lastYear, ProdcalError } from 'prodcalendar';
-import { CronsenseError, describe, nextRuns, occurrences, parse, parseCron, toRRule, toSystemd, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
+import { CronsenseError, describe, nextRuns, occurrences, parse, parseCron, toRRule, toSystemd, when, type ErrorCode, type FieldName, type Locale, type Schedule } from '../src/index.js';
 
-type Mode = 'text' | 'cron' | 'dates';
+type Mode = 'text' | 'cron' | 'dates' | 'when';
 
 interface Strings {
   readonly tagline: string;
   readonly modeText: string;
   readonly modeCron: string;
   readonly modeDates: string;
+  readonly modeWhen: string;
+  readonly whenExamples: readonly string[];
   readonly noRRule: string;
   readonly calendarLimit: string;
   readonly weekdaysOnly: string;
@@ -32,11 +34,13 @@ const STRINGS: { readonly [L in Locale]: Strings } = {
     modeText: 'Текст → cron',
     modeCron: 'cron → текст',
     modeDates: 'Даты и RRULE',
+    modeWhen: 'Разовый момент',
+    whenExamples: ['через 4 часа', 'завтра в двенадцать семнадцать', 'через месяц ровно, в 12:17', 'послезавтра в 9 утра', 'через полтора часа', 'через неделю в 10', 'через год', 'по пятницам в 19:00'],
     noRRule: 'В RRULE не выражается',
     calendarLimit: 'Производственный календарь известен до конца {year} года',
     weekdaysOnly: 'RRULE не знает праздников: в нём только пн–пт, а даты ниже учитывают производственный календарь',
     dateExamples: ['в последний рабочий день месяца в 18:00', 'в первый рабочий день месяца в 9:00', 'в Троицу', 'на Масленицу', 'в День Победы в 10 утра', 'на 23 февраля и 8 марта', 'в Пасху в 10 утра', 'в первый понедельник месяца в 9:30', 'каждые 2 недели по понедельникам в 19:00', 'за 46 дней до католической Пасхи', 'по рабочим дням в 9:30'],
-    inputLabel: { text: 'Опишите расписание словами', cron: 'Введите cron-выражение', dates: 'Опишите расписание: рабочие дни, Пасха, N-й день недели' },
+    inputLabel: { text: 'Опишите расписание словами', cron: 'Введите cron-выражение', dates: 'Опишите расписание: рабочие дни, Пасха, N-й день недели', when: 'Когда? «через 4 часа», «завтра в 12:17»' },
     copy: 'Копировать',
     copied: 'Скопировано',
     nextRuns: 'Ближайшие запуски',
@@ -53,7 +57,7 @@ const STRINGS: { readonly [L in Locale]: Strings } = {
       AMBIGUOUS: 'Неоднозначно: время это или число месяца?',
       CONFLICT: 'Части расписания противоречат друг другу',
       INCOMPLETE: 'Не хватает части расписания',
-      UNSUPPORTED: 'Cron не умеет выражать это точно',
+      UNSUPPORTED: 'Не поддерживается',
       INVALID_CRON: 'Некорректное cron-выражение',
     },
   },
@@ -62,11 +66,13 @@ const STRINGS: { readonly [L in Locale]: Strings } = {
     modeText: 'Text → cron',
     modeCron: 'cron → text',
     modeDates: 'Dates and RRULE',
+    modeWhen: 'One-time moment',
+    whenExamples: ['in 4 hours', 'tomorrow at 9am', 'in 3 days at 5pm', 'in 2 weeks', 'every friday at 7pm'],
     noRRule: 'Not expressible in RRULE',
     calendarLimit: 'The production calendar is known until the end of {year}',
     weekdaysOnly: 'RRULE cannot know holidays: it has Monday to Friday, while the dates below follow the production calendar',
     dateExamples: ['last working day of the month at 6pm', 'first monday of the month at 9am', 'good friday', 'christmas and orthodox christmas', '49 days after easter', 'orthodox easter at 10am', 'every other monday at 7pm', 'last weekday of the month at 5pm'],
-    inputLabel: { text: 'Describe a schedule in words', cron: 'Enter a cron expression', dates: 'Describe a schedule: working days, Easter, Nth weekdays' },
+    inputLabel: { text: 'Describe a schedule in words', cron: 'Enter a cron expression', dates: 'Describe a schedule: working days, Easter, Nth weekdays', when: 'When? “in 4 hours”, “tomorrow at 9am”' },
     copy: 'Copy',
     copied: 'Copied',
     nextRuns: 'Next runs',
@@ -83,7 +89,7 @@ const STRINGS: { readonly [L in Locale]: Strings } = {
       AMBIGUOUS: 'Ambiguous: is it a time or a day of month?',
       CONFLICT: 'Parts of the schedule contradict each other',
       INCOMPLETE: 'Part of the schedule is missing',
-      UNSUPPORTED: 'Cron cannot express this exactly',
+      UNSUPPORTED: 'Not supported',
       INVALID_CRON: 'Invalid cron expression',
     },
   },
@@ -103,11 +109,12 @@ const copy = element('copy', HTMLButtonElement);
 const description = element('description', HTMLParagraphElement);
 const fields = element('fields', HTMLDivElement);
 const runs = element('runs', HTMLOListElement);
+const runsTitle = element('runs-title', HTMLElement);
 const error = element('error', HTMLDivElement);
 const errorTitle = element('error-title', HTMLElement);
 const errorExcerpt = element('error-excerpt', HTMLPreElement);
 
-const isMode = (value: string | null | undefined): value is Mode => value === 'text' || value === 'cron' || value === 'dates';
+const isMode = (value: string | null | undefined): value is Mode => value === 'text' || value === 'cron' || value === 'dates' || value === 'when';
 const isLocale = (value: string | null | undefined): value is Locale => value === 'ru' || value === 'en';
 
 const hash = new URLSearchParams(location.hash.slice(1));
@@ -133,7 +140,7 @@ const renderChrome = (): void => {
   document.documentElement.lang = state.lang;
   for (const node of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
     const key = node.dataset['i18n'];
-    if (key === 'tagline' || key === 'modeText' || key === 'modeCron' || key === 'modeDates' || key === 'copy' || key === 'nextRuns' || key === 'install') {
+    if (key === 'tagline' || key === 'modeText' || key === 'modeCron' || key === 'modeDates' || key === 'modeWhen' || key === 'copy' || key === 'nextRuns' || key === 'install') {
       node.textContent = text[key];
     } else if (key === 'inputLabel') {
       node.textContent = text.inputLabel[state.mode];
@@ -148,7 +155,7 @@ const renderChrome = (): void => {
   }
   input.classList.toggle('mono', state.mode === 'cron');
   examples.replaceChildren(
-    ...(state.mode === 'text' ? text.examples : state.mode === 'dates' ? text.dateExamples : CRON_EXAMPLES).map((example) => {
+    ...(state.mode === 'text' ? text.examples : state.mode === 'dates' ? text.dateExamples : state.mode === 'when' ? text.whenExamples : CRON_EXAMPLES).map((example) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.textContent = example;
@@ -197,6 +204,7 @@ const showSchedule = (schedule: Schedule): void => {
       return item;
     }),
   );
+  runsTitle.hidden = runs.childElementCount === 0;
   result.hidden = false;
   error.hidden = true;
 };
@@ -241,6 +249,36 @@ const showDates = (value: string): void => {
       return item;
     }),
   );
+  runsTitle.hidden = runs.childElementCount === 0;
+  result.hidden = false;
+  error.hidden = true;
+};
+
+const RELATIVE_UNITS: ReadonlyArray<readonly [Intl.RelativeTimeFormatUnit, number]> = [
+  ['year', 365 * 86_400_000],
+  ['month', 30 * 86_400_000],
+  ['week', 7 * 86_400_000],
+  ['day', 86_400_000],
+  ['hour', 3_600_000],
+  ['minute', 60_000],
+];
+
+const relative = (date: Date, now: Date): string => {
+  const difference = date.getTime() - now.getTime();
+  const [unit, size] = RELATIVE_UNITS.find(([, length]) => Math.abs(difference) >= length) ?? ['minute', 60_000];
+  return new Intl.RelativeTimeFormat(state.lang, { numeric: 'auto' }).format(Math.round(difference / size), unit);
+};
+
+const showWhen = (value: string): void => {
+  const now = new Date();
+  const moment = when(value, { now, isWorkday });
+  cron.textContent = formatRun(moment);
+  cron.classList.add('rule');
+  state.copyValue = moment.toISOString();
+  description.textContent = relative(moment, now);
+  fields.hidden = true;
+  runs.replaceChildren();
+  runsTitle.hidden = runs.childElementCount === 0;
   result.hidden = false;
   error.hidden = true;
 };
@@ -273,6 +311,10 @@ const update = (): void => {
       showDates(value);
       return;
     }
+    if (state.mode === 'when') {
+      showWhen(value);
+      return;
+    }
     state.schedule = state.mode === 'text' ? parse(value) : parseCron(value);
     showSchedule(state.schedule);
   } catch (failure: unknown) {
@@ -286,7 +328,7 @@ const switchMode = (mode: Mode): void => {
   const schedule = state.schedule;
   const previous = state.mode;
   state.mode = mode;
-  const keepText = (mode === 'dates' && previous === 'text') || (mode === 'text' && previous === 'dates');
+  const keepText = mode !== 'cron' && previous !== 'cron';
   if (!keepText) input.value = schedule === null ? '' : mode === 'cron' ? schedule.cron : describe(schedule, { locale: state.lang });
   renderChrome();
   update();
@@ -327,7 +369,7 @@ copy.addEventListener('click', () => {
 
 input.addEventListener('input', update);
 
-input.value = hash.get('q') ?? (state.mode === 'text' ? strings().examples : state.mode === 'dates' ? strings().dateExamples : CRON_EXAMPLES)[0] ?? '';
+input.value = hash.get('q') ?? (state.mode === 'text' ? strings().examples : state.mode === 'dates' ? strings().dateExamples : state.mode === 'when' ? strings().whenExamples : CRON_EXAMPLES)[0] ?? '';
 renderChrome();
 update();
 input.focus();

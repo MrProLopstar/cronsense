@@ -231,6 +231,7 @@ LLMs regularly produce subtly wrong cron. `cronsense-mcp` gives agents determini
 | `to_cron` | Schedule text → cron plus canonical description |
 | `describe_cron` | Cron → natural Russian or English |
 | `next_runs` | Upcoming run times as ISO 8601 |
+| `when` | One-time moment for «через 4 часа» or «завтра в 12:17» as ISO 8601 |
 
 Claude Code:
 
