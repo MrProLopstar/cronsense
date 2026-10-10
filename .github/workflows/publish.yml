@@ -32,10 +32,10 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - id: version
@@ -99,10 +99,10 @@ jobs:
     env:
       TAG: ${{ (github.ref_type == 'tag' && github.ref_name) || inputs.tag || needs.release.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.TAG }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -126,7 +126,7 @@ jobs:
             npm publish --access public --provenance --ignore-scripts
           fi
       - run: npx jsr publish
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://npm.pkg.github.com
