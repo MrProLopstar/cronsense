@@ -117,7 +117,11 @@ export const when = (input: string, options: WhenOptions = {}): Date => {
 
   if (dayWord === undefined && !relative) {
     const [next] = occurrences(input, { ...options, from: new Date(now.getTime() + 1), to: new Date(now.getTime() + 3_660 * 86_400_000), limit: 1 });
-    if (!next) throw new CronsenseError('UNSUPPORTED', `"${input}" does not happen in the next ten years`, input);
+    if (!next) {
+      const { year } = parse(input, options);
+      const past = year !== undefined && year < (utc ? now.getUTCFullYear() : now.getFullYear()) + 1;
+      throw new CronsenseError('UNSUPPORTED', past ? `"${input}" is already in the past` : `"${input}" does not happen in the next ten years`, input);
+    }
     return next;
   }
 

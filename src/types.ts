@@ -29,6 +29,11 @@ export type CronFields = { readonly [K in FieldName]: CronField };
 export interface Schedule {
   readonly cron: string;
   readonly fields: CronFields;
+  /**
+   * Year of a date such as «8 ноября 2026» or `2026-11-08`. Cron has no year field, so {@link Schedule.cron} repeats
+   * every year; {@link nextRuns}, `when`, `occurrences` and `toSystemd` keep to this year.
+   */
+  readonly year?: number;
 }
 
 /** Options for {@link parse}. */

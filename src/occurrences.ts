@@ -103,6 +103,7 @@ export const occurrences = (input: string, options: OccurrenceOptions): Date[] =
   const dayMatches = (year: number, month: number, day: number, weekday: number): boolean => {
     const serial = dayNumber(year, month, day);
     const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (plan.year !== null && year !== plan.year) return false;
     if (plan.byMonth.length > 0 && !plan.byMonth.includes(month)) return false;
     if (plan.byMonthDay.length > 0 && !plan.byMonthDay.some((value) => (value > 0 ? value === day : length + value + 1 === day))) return false;
     if (plan.bySetPos.length > 0 && !positions(year, month).has(day)) return false;

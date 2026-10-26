@@ -9,12 +9,16 @@ export type Token =
   | Spanned<{ readonly t: 'num'; readonly value: number; readonly ordinal: boolean }>
   | Spanned<{ readonly t: 'time'; readonly hour: number; readonly minute: number; readonly padded: boolean }>
   | Spanned<{ readonly t: 'dash' }>
+  | Spanned<{ readonly t: 'year'; readonly value: number }>
   | Spanned<{ readonly t: 'holiday'; readonly holiday: Holiday }>
   | Spanned<Exclude<Lexeme, { readonly t: 'noise' | 'ordinal' | 'cardinal' | 'halfOf' | 'amount' | 'unsupported' }>>;
 
 export type TokenOf<K extends Token['t']> = Extract<Token, { readonly t: K }>;
 
 const SPACE = /\s+/y;
+// whole dates: 8.11.2026, 8/11/2026 and 2026-11-08
+const DATE_DMY = /(\d{1,2})[./](\d{1,2})[./](\d{4})(?!\d)/y;
+const DATE_ISO = /(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/y;
 const TIME = /(\d{1,2})[:.](\d{2})(?!\d)/y;
 const NUMBER = /(\d+)(?:-?(?:го|ое|ого|ой|ье|е|й|ый|ий|th|st|nd|rd)(?!\p{L}))?(?!\d)/uy;
 const WORD = /\p{L}+/uy;
@@ -38,6 +42,14 @@ const matchAt = (pattern: RegExp, text: string, index: number): RegExpExecArray 
 
 const NEVER = /(?:(?:когда )?рак\S* на горе свистн\S*|после дождичка в четверг|на морском дне|на греческие календы|никогда|when pigs fly|once in a blue moon)/;
 
+/** Whether a 4-digit number here follows a date: «8 ноября», "November 8" or "November 8," before it. */
+const afterDate = (tokens: readonly Token[]): boolean => {
+  const [a, b, c] = [tokens.at(-1), tokens.at(-2), tokens.at(-3)];
+  if (a?.t === 'month') return true;
+  if (a?.t === 'num' && b?.t === 'month') return true;
+  return a?.t === 'and' && b?.t === 'num' && c?.t === 'month';
+};
+
 export const tokenize = (input: string): Token[] => {
   const text = normalize(input);
   const never = NEVER.exec(text);
@@ -55,6 +67,18 @@ export const tokenize = (input: string): Token[] => {
       continue;
     }
 
+    const date = matchAt(DATE_DMY, text, index) ?? matchAt(DATE_ISO, text, index);
+    if (date !== null) {
+      const span = { start: index, end: index + date[0].length };
+      const iso = date[1]?.length === 4;
+      const [day, month, year] = (iso ? [date[3], date[2], date[1]] : [date[1], date[2], date[3]]).map(Number) as [number, number, number];
+      if (month < 1 || month > 12) throw new CronsenseError('OUT_OF_RANGE', `Month ${month} is out of range 1-12`, input, span);
+      // read as «8 ноября 2026»: the day, the month and the year
+      tokens.push({ t: 'num', value: day, ordinal: false, span }, { t: 'month', month, span }, { t: 'year', value: year, span });
+      index = span.end;
+      continue;
+    }
+
     const time = matchAt(TIME, text, index);
     if (time !== null) {
       const span = { start: index, end: index + time[0].length };
@@ -67,6 +91,13 @@ export const tokenize = (input: string): Token[] => {
     if (number !== null) {
       const span = { start: index, end: index + number[0].length };
       const digits = number[1] ?? '';
+      if (digits.length === 4 && afterDate(tokens)) {
+        // «8 ноября 2026», "November 8, 2026": a year after a date
+        if (tokens.at(-1)?.t === 'and') tokens.pop();
+        tokens.push({ t: 'year', value: Number(digits), span });
+        index = span.end;
+        continue;
+      }
       tokens.push({ t: 'num', value: Number(digits), ordinal: number[0].length > digits.length, span });
       index = span.end;
       continue;
@@ -82,6 +113,11 @@ export const tokenize = (input: string): Token[] => {
     const word = matchAt(WORD, text, index);
     if (word !== null) {
       const span = { start: index, end: index + word[0].length };
+      // «2026 года», «2026 г.», "2026 year" only repeat that it is a year
+      if (tokens.at(-1)?.t === 'year' && /^(?:года?|г|year)$/.test(word[0])) {
+        index = span.end;
+        continue;
+      }
       const lexeme = lookupWord(word[0]);
       if (lexeme === null) {
         throw new CronsenseError('UNKNOWN_WORD', `Unknown word "${input.slice(span.start, span.end)}"`, input, span);

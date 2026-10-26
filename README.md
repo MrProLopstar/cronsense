@@ -302,6 +302,7 @@ The server has no dependencies and speaks MCP over stdio (protocol versions 2024
 - Time ranges for intervals: «с 9 до 18», "between 9 and 17", «до 12», overnight windows like «с 22 до 6»
 - Weekdays: names, abbreviations, ranges (`пн-пт`, "monday through friday"), weekdays / weekends
 - Days of month: «1 и 15 числа», «с 1 по 10 число», "on the 1st and 15th", «15 января», "jan 15"
+- Dates with a year: «8 ноября 2026», `8.11.2026`, `2026-11-08`, "November 8, 2026". Cron has no year field, so `cron` repeats every year and `schedule.year` holds the year; `when`, `nextRuns`, `occurrences` and `toSystemd` keep to it, `toRRule` refuses
 - Months: names, lists, ranges, including ranges across the new year («с ноября по февраль»)
 
 ## Describing cron

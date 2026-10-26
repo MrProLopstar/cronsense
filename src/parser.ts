@@ -17,6 +17,7 @@ export interface Plan {
   readonly setPosGroup: 'weekday' | 'workday' | null;
   readonly workdays: boolean;
   readonly easter: EasterCalendar;
+  readonly year: number | null;
 }
 
 interface Interval {
@@ -92,6 +93,7 @@ class Parser {
   private hourParity: 'even' | 'odd' | null = null;
   private dayParity: { readonly odd: boolean; readonly span: Span } | null = null;
   private count: { readonly times: number; readonly unit: Unit; readonly span: Span } | null = null;
+  private year: { readonly value: number; readonly span: Span } | null = null;
 
   constructor(
     private readonly input: string,
@@ -103,7 +105,7 @@ class Parser {
   run(): Schedule {
     this.consume();
     const fields = this.build();
-    return { cron: formatCron(fields), fields };
+    return { cron: formatCron(fields), fields, ...(this.year !== null ? { year: this.year.value } : {}) };
   }
 
   runRRule(): string {
@@ -284,6 +286,12 @@ class Parser {
         return;
       case 'holiday':
         this.addHoliday(token, null);
+        return;
+      case 'year':
+        if (this.year !== null && this.year.value !== token.value) {
+          this.fail('CONFLICT', `Two different years: ${this.year.value} and ${token.value}`, join(this.year.span, token.span));
+        }
+        this.year = { value: token.value, span: token.span };
         return;
       case 'parity':
         this.parity(token, token.span);
@@ -1206,12 +1214,16 @@ class Parser {
       setPosGroup: this.setPosGroup,
       workdays: this.workdayFilter,
       easter: this.easterCalendar(),
+      year: this.year?.value ?? null,
     };
   }
 
   private rrule(): string {
     if (this.easterOffsets.length > 0 && this.holidayDates.length > 0) {
       this.fail('UNSUPPORTED', `Fixed holidays and Easter-based holidays cannot share one RRULE; split them or use occurrences`, this.easterSpan);
+    }
+    if (this.year !== null) {
+      this.fail('UNSUPPORTED', `An RRULE does not hold a year; use when() or occurrences() for a date in ${this.year.value}`, this.year.span);
     }
     const plan = this.plan(false);
     if (plan.byEaster.length > 0) {

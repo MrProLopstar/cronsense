@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
+## 1.10.0
+
+- Dates with a year: «8 ноября 2026», `8.11.2026`, `8/11/2026`, `2026-11-08`, "November 8, 2026"; the year goes to the new `Schedule.year`, and `when`, `nextRuns`, `occurrences` and `toSystemd` keep to it. `toRRule` refuses a year instead of dropping it
+- `when()` says a date is already in the past instead of "does not happen in the next ten years"
+
 ## 1.9.0
 
 - MCP tool `when` for one-time moments, so agents stop computing reminder dates by hand

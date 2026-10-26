@@ -35,6 +35,7 @@ const UTC: Calendar = {
 /** Returns the upcoming run times of a schedule or a cron expression. */
 export const nextRuns = (schedule: Schedule | string, options: NextRunsOptions = {}): Date[] => {
   const fields: CronFields = typeof schedule === 'string' ? parseCron(schedule).fields : schedule.fields;
+  const only = typeof schedule === 'string' ? undefined : schedule.year;
   const count = options.count ?? 5;
   const from = options.from ?? new Date();
   if (!Number.isInteger(count) || count < 0) {
@@ -67,6 +68,10 @@ export const nextRuns = (schedule: Schedule | string, options: NextRunsOptions =
 
   for (let offset = 0; offset < SEARCH_DAYS && runs.length < count; offset += 1) {
     const midnight = calendar.make(year, month, day + offset, 12, 0);
+    if (only !== undefined && calendar.year(midnight) !== only) {
+      if (calendar.year(midnight) > only) break;
+      continue;
+    }
     if (!months.has(calendar.month(midnight) + 1) || !matchesDay(midnight)) continue;
     for (const hour of hours) {
       for (const minute of minutes) {

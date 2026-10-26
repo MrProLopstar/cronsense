@@ -59,6 +59,11 @@ const hint = (plan: Plan): string => {
  */
 export const toSystemd = (input: string, options: ParseOptions = {}): string[] => {
   const plan = toPlan(input, options);
+  // the first «*» of a calendar event is the year
+  return plan.year === null ? events(input, plan) : events(input, plan).map((line) => line.replace('*-', `${plan.year}-`));
+};
+
+const events = (input: string, plan: Plan): string[] => {
   if (plan.byEaster.length > 0) unsupported(input, 'systemd calendar events cannot follow Easter; use occurrences');
   if (plan.setPosGroup !== null) unsupported(input, 'systemd calendar events cannot pick the Nth working day; use occurrences');
   if (plan.interval > 1) unsupported(input, `systemd calendar events cannot count intervals from a start point; use a monotonic timer such as ${hint(plan)}`);
