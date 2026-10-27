@@ -2,9 +2,13 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org).
 
-## 1.11.0
+## 1.12.0
 
 - `toRRule` accepts dates with a year: «8.11.2026 в 10:00» → `FREQ=YEARLY;BYMONTH=11;BYMONTHDAY=8;BYHOUR=10;BYMINUTE=0;UNTIL=20261231T235959`. Start the rule (DTSTART) in that year or later
+
+## 1.11.0
+
+- Same code as 1.10.0, published by mistake before the RRULE change
 
 ## 1.10.0
 
