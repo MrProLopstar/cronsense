@@ -31,7 +31,7 @@ export interface Schedule {
   readonly fields: CronFields;
   /**
    * Year of a date such as «8 ноября 2026» or `2026-11-08`. Cron has no year field, so {@link Schedule.cron} repeats
-   * every year; {@link nextRuns}, `when`, `occurrences` and `toSystemd` keep to this year.
+   * every year; {@link nextRuns}, `when`, `occurrences` and `toSystemd` keep to this year, `toRRule` ends the rule with it.
    */
   readonly year?: number;
 }

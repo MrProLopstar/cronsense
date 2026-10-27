@@ -1222,9 +1222,6 @@ class Parser {
     if (this.easterOffsets.length > 0 && this.holidayDates.length > 0) {
       this.fail('UNSUPPORTED', `Fixed holidays and Easter-based holidays cannot share one RRULE; split them or use occurrences`, this.easterSpan);
     }
-    if (this.year !== null) {
-      this.fail('UNSUPPORTED', `An RRULE does not hold a year; use when() or occurrences() for a date in ${this.year.value}`, this.year.span);
-    }
     const plan = this.plan(false);
     if (plan.byEaster.length > 0) {
       if (plan.easter === 'orthodox') {
@@ -1248,6 +1245,8 @@ class Parser {
     if (plan.byHour !== null) parts.push(`BYHOUR=${plan.byHour.join(',')}`);
     if (plan.byMinute !== null) parts.push(`BYMINUTE=${plan.byMinute.join(',')}`);
     if (plan.byEaster.length > 0) parts.push(`BYEASTER=${plan.byEaster.join(',')}`);
+    // RRULE has no year field: the rule ends with that year, and DTSTART must not be earlier than its start
+    if (plan.year !== null) parts.push(`UNTIL=${plan.year}1231T235959`);
     return parts.join(';');
   }
 }

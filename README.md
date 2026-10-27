@@ -162,7 +162,7 @@ occurrences('в последний рабочий день месяца в 18:00
 occurrences('по рабочим дням в 9:30', { from, to, isWorkday });              // skips holidays, keeps working Saturdays
 ```
 
-«Будний день» always means Monday to Friday, so «в первый будний день месяца» also works in `toRRule` as `BYSETPOS`. «Рабочий день» depends on holidays, which neither cron nor RRULE can express: `toRRule` refuses it, and in cron «по рабочим дням» stays Monday to Friday.
+«Будний день» always means Monday to Friday, so «в первый будний день месяца» also works in `toRRule` as `BYSETPOS`. «Рабочий день» depends on holidays, which neither cron nor RRULE can express: `toRRule` ends the rule with `UNTIL=<year>1231T235959` (start DTSTART in that year) it, and in cron «по рабочим дням» stays Monday to Friday.
 
 ## Easter
 
